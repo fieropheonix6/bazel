@@ -19,6 +19,7 @@ import com.google.devtools.build.lib.analysis.BlazeDirectories;
 import com.google.devtools.build.lib.analysis.ConfiguredRuleClassProvider;
 import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleResolutionFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.FakeRegistry;
+import com.google.devtools.build.lib.bazel.bzlmod.FullModuleResolutionFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleFileFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.NonRegistryOverride;
 import com.google.devtools.build.lib.bazel.rules.android.AndroidNdkRepositoryFunction;
@@ -142,6 +143,8 @@ public abstract class AnalysisMock extends LoadingMock {
             getBuiltinModules(directories)),
         SkyFunctions.BAZEL_MODULE_RESOLUTION,
         new BazelModuleResolutionFunction(),
+        SkyFunctions.FULL_MODULE_RESOLUTION,
+        new FullModuleResolutionFunction(),
         SkyFunctions.CLIENT_ENVIRONMENT_VARIABLE,
         new ClientEnvironmentFunction(new AtomicReference<>(ImmutableMap.of())),
         CcSkyframeFdoSupportValue.SKYFUNCTION,
