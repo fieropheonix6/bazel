@@ -118,6 +118,7 @@ public class BazelModuleResolutionFunctionTest extends FoundationTestCase {
                     new ModuleFileFunction(registryFactory, rootDirectory, ImmutableMap.of()))
                 .put(SkyFunctions.PRECOMPUTED, new PrecomputedFunction())
                 .put(SkyFunctions.BAZEL_MODULE_RESOLUTION, new BazelModuleResolutionFunction())
+                .put(SkyFunctions.BAZEL_MODULE_SELECTION, new BazelModuleSelectionFunction())
                 .put(
                     SkyFunctions.CLIENT_ENVIRONMENT_VARIABLE,
                     new ClientEnvironmentFunction(new AtomicReference<>(ImmutableMap.of())))
@@ -129,7 +130,7 @@ public class BazelModuleResolutionFunctionTest extends FoundationTestCase {
         StarlarkSemantics.builder().setBool(BuildLanguageOptions.ENABLE_BZLMOD, true).build());
     ModuleFileFunction.IGNORE_DEV_DEPS.set(differencer, false);
     ModuleFileFunction.MODULE_OVERRIDES.set(differencer, ImmutableMap.of());
-    BazelModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES.set(
+    BazelModuleSelectionFunction.CHECK_DIRECT_DEPENDENCIES.set(
         differencer, CheckDirectDepsMode.OFF);
     BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE.set(
         differencer, BazelCompatibilityMode.ERROR);
@@ -183,15 +184,9 @@ public class BazelModuleResolutionFunctionTest extends FoundationTestCase {
                     .setKey(createModuleKey("rules_java", ""))
                     .build())
             .buildOrThrow();
-    ImmutableMap<String, ModuleOverride> overrides =
-        ImmutableMap.of(
-            "dep",
-                MultipleVersionOverride.create(
-                    ImmutableList.of(Version.parse("1.0"), Version.parse("2.0")), ""),
-            "rules_java", LocalPathOverride.create("bleh"));
 
     BazelModuleResolutionValue value =
-        BazelModuleResolutionFunction.createValue(depGraph, depGraph, overrides);
+        BazelModuleResolutionFunction.createValue(depGraph);
     assertThat(value.getCanonicalRepoNameLookup())
         .containsExactly(
             RepositoryName.MAIN,
@@ -265,7 +260,7 @@ public class BazelModuleResolutionFunctionTest extends FoundationTestCase {
             Label.parseCanonical("@@dep~2.0//incredible:conflict.bzl"), "myext");
 
     BazelModuleResolutionValue value =
-        BazelModuleResolutionFunction.createValue(depGraph, depGraph, ImmutableMap.of());
+        BazelModuleResolutionFunction.createValue(depGraph);
     assertThat(value.getExtensionUsagesTable()).hasSize(5);
     assertThat(value.getExtensionUsagesTable())
         .containsCell(maven, ModuleKey.ROOT, root.getExtensionUsages().get(0));

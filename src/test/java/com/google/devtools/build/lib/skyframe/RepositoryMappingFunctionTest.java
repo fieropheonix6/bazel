@@ -27,6 +27,7 @@ import com.google.devtools.build.lib.analysis.BlazeDirectories;
 import com.google.devtools.build.lib.analysis.util.AnalysisMock;
 import com.google.devtools.build.lib.analysis.util.BuildViewTestCase;
 import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleResolutionFunction;
+import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleSelectionFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.FakeRegistry;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleFileFunction;
 import com.google.devtools.build.lib.bazel.repository.RepositoryOptions.BazelCompatibilityMode;
@@ -77,7 +78,7 @@ public class RepositoryMappingFunctionTest extends BuildViewTestCase {
         getSkyframeExecutor().getDifferencerForTesting(), ImmutableMap.of());
     BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS.set(
         getSkyframeExecutor().getDifferencerForTesting(), ImmutableList.of());
-    BazelModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES.set(
+    BazelModuleSelectionFunction.CHECK_DIRECT_DEPENDENCIES.set(
         getSkyframeExecutor().getDifferencerForTesting(), CheckDirectDepsMode.WARNING);
     BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE.set(
         getSkyframeExecutor().getDifferencerForTesting(), BazelCompatibilityMode.ERROR);

@@ -124,6 +124,7 @@ public final class BzlmodRepoRuleFunctionTest extends FoundationTestCase {
                     BzlmodRepoRuleValue.BZLMOD_REPO_RULE,
                     new BzlmodRepoRuleFunction(ruleClassProvider, directories))
                 .put(SkyFunctions.BAZEL_MODULE_RESOLUTION, new BazelModuleResolutionFunction())
+                .put(SkyFunctions.BAZEL_MODULE_SELECTION, new BazelModuleSelectionFunction())
                 .put(
                     SkyFunctions.MODULE_FILE,
                     new ModuleFileFunction(registryFactory, workspaceRoot, ImmutableMap.of()))
@@ -137,7 +138,7 @@ public final class BzlmodRepoRuleFunctionTest extends FoundationTestCase {
     ModuleFileFunction.IGNORE_DEV_DEPS.set(differencer, false);
     ModuleFileFunction.MODULE_OVERRIDES.set(differencer, ImmutableMap.of());
     BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS.set(differencer, ImmutableList.of());
-    BazelModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES.set(
+    BazelModuleSelectionFunction.CHECK_DIRECT_DEPENDENCIES.set(
         differencer, CheckDirectDepsMode.WARNING);
     BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE.set(
         differencer, BazelCompatibilityMode.ERROR);
