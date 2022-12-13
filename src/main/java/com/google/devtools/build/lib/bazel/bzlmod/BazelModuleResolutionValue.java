@@ -38,14 +38,12 @@ public abstract class BazelModuleResolutionValue implements SkyValue {
 
   public static BazelModuleResolutionValue create(
       ImmutableMap<ModuleKey, Module> depGraph,
-      ImmutableMap<ModuleKey, Module> unprunedDepGraph,
       ImmutableMap<RepositoryName, ModuleKey> canonicalRepoNameLookup,
       ImmutableList<AbridgedModule> abridgedModules,
       ImmutableTable<ModuleExtensionId, ModuleKey, ModuleExtensionUsage> extensionUsagesTable,
       ImmutableMap<ModuleExtensionId, String> extensionUniqueNames) {
     return new AutoValue_BazelModuleResolutionValue(
         depGraph,
-        unprunedDepGraph,
         canonicalRepoNameLookup,
         abridgedModules,
         extensionUsagesTable,
@@ -57,14 +55,6 @@ public abstract class BazelModuleResolutionValue implements SkyValue {
    * any KEY in the returned map, it's guaranteed that {@code depGraph[KEY].getKey() == KEY}.
    */
   public abstract ImmutableMap<ModuleKey, Module> getDepGraph();
-
-  /**
-   * The post-selection un-pruned dep graph, used for in-depth inspection. TODO(andreisolo): decide
-   * whether to store the un-pruned graph or just the removed modules? Random order (depends on
-   * SkyFrame execution order). For any KEY in the returned map, it's guaranteed that {@code
-   * depGraph[KEY].getKey() == KEY}.
-   */
-  public abstract ImmutableMap<ModuleKey, Module> getUnprunedDepGraph();
 
   /** A mapping from a canonical repo name to the key of the module backing it. */
   public abstract ImmutableMap<RepositoryName, ModuleKey> getCanonicalRepoNameLookup();

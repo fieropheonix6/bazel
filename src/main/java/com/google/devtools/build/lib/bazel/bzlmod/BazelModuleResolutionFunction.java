@@ -31,10 +31,8 @@ import com.google.common.collect.ImmutableTable;
 import com.google.devtools.build.lib.analysis.BlazeVersionInfo;
 import com.google.devtools.build.lib.bazel.BazelVersion;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleFileValue.RootModuleFileValue;
-import com.google.devtools.build.lib.bazel.bzlmod.Selection.SelectionResult;
 import com.google.devtools.build.lib.bazel.bzlmod.Version.ParseException;
 import com.google.devtools.build.lib.bazel.repository.RepositoryOptions.BazelCompatibilityMode;
-import com.google.devtools.build.lib.bazel.repository.RepositoryOptions.CheckDirectDepsMode;
 import com.google.devtools.build.lib.cmdline.LabelSyntaxException;
 import com.google.devtools.build.lib.cmdline.PackageIdentifier;
 import com.google.devtools.build.lib.cmdline.RepositoryName;
@@ -54,7 +52,6 @@ import com.google.devtools.build.skyframe.SkyKey;
 import com.google.devtools.build.skyframe.SkyValue;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -66,13 +63,11 @@ import javax.annotation.Nullable;
  */
 public class BazelModuleResolutionFunction implements SkyFunction {
 
-  public static final Precomputed<CheckDirectDepsMode> CHECK_DIRECT_DEPENDENCIES =
-      new Precomputed<>("check_direct_dependency");
   public static final Precomputed<BazelCompatibilityMode> BAZEL_COMPATIBILITY_MODE =
       new Precomputed<>("bazel_compatibility_mode");
-
   public static final Precomputed<List<String>> ALLOWED_YANKED_VERSIONS =
       new Precomputed<>("allowed_yanked_versions");
+
   private static final String BZLMOD_ALLOWED_YANKED_VERSIONS_ENV = "BZLMOD_ALLOW_YANKED_VERSIONS";
 
   @Override
@@ -90,16 +85,10 @@ public class BazelModuleResolutionFunction implements SkyFunction {
     if (root == null) {
       return null;
     }
-    ImmutableMap<ModuleKey, Module> initialDepGraph = Discovery.run(env, root);
-    if (initialDepGraph == null) {
+    BazelModuleSelectionValue selectionResult =
+        (BazelModuleSelectionValue) env.getValue(BazelModuleSelectionValue.KEY);
+    if (env.valuesMissing()) {
       return null;
-    }
-    ImmutableMap<String, ModuleOverride> overrides = root.getOverrides();
-    SelectionResult selectionResult;
-    try {
-      selectionResult = Selection.run(initialDepGraph, overrides);
-    } catch (ExternalDepsException e) {
-      throw new BazelModuleResolutionFunctionException(e, Transience.PERSISTENT);
     }
     ImmutableMap<ModuleKey, Module> resolvedDepGraph = selectionResult.getResolvedDepGraph();
 
@@ -107,15 +96,15 @@ public class BazelModuleResolutionFunction implements SkyFunction {
         resolvedDepGraph.values(),
         Objects.requireNonNull(BAZEL_COMPATIBILITY_MODE.get(env)),
         env.getListener());
+
     verifyYankedVersions(
         resolvedDepGraph,
         parseYankedVersions(
             allowedYankedVersionsFromEnv.getValue(),
             Objects.requireNonNull(ALLOWED_YANKED_VERSIONS.get(env))),
         env.getListener());
-    verifyRootModuleDirectDepsAreAccurate(
-        env, initialDepGraph.get(ModuleKey.ROOT), resolvedDepGraph.get(ModuleKey.ROOT));
-    return createValue(resolvedDepGraph, selectionResult.getUnprunedDepGraph(), overrides);
+    
+    return createValue(resolvedDepGraph);
   }
 
   public static void checkBazelCompatibility(
@@ -291,43 +280,8 @@ public class BazelModuleResolutionFunction implements SkyFunction {
     }
   }
 
-  private static void verifyRootModuleDirectDepsAreAccurate(
-      Environment env, Module discoveredRootModule, Module resolvedRootModule)
-      throws InterruptedException, BazelModuleResolutionFunctionException {
-    CheckDirectDepsMode mode = Objects.requireNonNull(CHECK_DIRECT_DEPENDENCIES.get(env));
-    if (mode == CheckDirectDepsMode.OFF) {
-      return;
-    }
-    boolean failure = false;
-    for (Map.Entry<String, ModuleKey> dep : discoveredRootModule.getDeps().entrySet()) {
-      ModuleKey resolved = resolvedRootModule.getDeps().get(dep.getKey());
-      if (!dep.getValue().equals(resolved)) {
-        String message =
-            String.format(
-                "For repository '%s', the root module requires module version %s, but got %s in the"
-                    + " resolved dependency graph.",
-                dep.getKey(), dep.getValue(), resolved);
-        if (mode == CheckDirectDepsMode.WARNING) {
-          env.getListener().handle(Event.warn(message));
-        } else {
-          env.getListener().handle(Event.error(message));
-          failure = true;
-        }
-      }
-    }
-    if (failure) {
-      throw new BazelModuleResolutionFunctionException(
-          ExternalDepsException.withMessage(
-              Code.VERSION_RESOLUTION_ERROR, "Direct dependency check failed."),
-          Transience.PERSISTENT);
-    }
-  }
-
   @VisibleForTesting
-  static BazelModuleResolutionValue createValue(
-      ImmutableMap<ModuleKey, Module> depGraph,
-      ImmutableMap<ModuleKey, Module> unprunedDepGraph,
-      ImmutableMap<String, ModuleOverride> overrides)
+  static BazelModuleResolutionValue createValue(ImmutableMap<ModuleKey, Module> depGraph)
       throws BazelModuleResolutionFunctionException {
     // Build some reverse lookups for later use.
     ImmutableMap<RepositoryName, ModuleKey> canonicalRepoNameLookup =
@@ -387,7 +341,6 @@ public class BazelModuleResolutionFunction implements SkyFunction {
 
     return BazelModuleResolutionValue.create(
         depGraph,
-        unprunedDepGraph,
         canonicalRepoNameLookup,
         depGraph.values().stream().map(AbridgedModule::from).collect(toImmutableList()),
         extensionUsagesById,
