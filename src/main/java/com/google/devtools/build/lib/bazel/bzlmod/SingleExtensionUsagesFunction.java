@@ -44,8 +44,8 @@ public class SingleExtensionUsagesFunction implements SkyFunction {
   @Nullable
   public SkyValue compute(SkyKey skyKey, Environment env)
       throws SkyFunctionException, InterruptedException {
-    BazelModuleResolutionValue bazelModuleResolutionValue =
-        (BazelModuleResolutionValue) env.getValue(BazelModuleResolutionValue.KEY);
+    BazelDepGraphValue bazelModuleResolutionValue =
+        (BazelDepGraphValue) env.getValue(BazelDepGraphValue.KEY);
     if (bazelModuleResolutionValue == null) {
       return null;
     }

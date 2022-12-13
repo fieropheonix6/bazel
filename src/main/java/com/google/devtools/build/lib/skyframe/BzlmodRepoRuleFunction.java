@@ -20,7 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.analysis.BlazeDirectories;
-import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleResolutionValue;
+import com.google.devtools.build.lib.bazel.bzlmod.BazelDepGraphValue;
 import com.google.devtools.build.lib.bazel.bzlmod.BzlmodRepoRuleCreator;
 import com.google.devtools.build.lib.bazel.bzlmod.BzlmodRepoRuleValue;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleExtensionId;
@@ -103,8 +103,12 @@ public final class BzlmodRepoRuleFunction implements SkyFunction {
       return null;
     }
 
+    // TODO we can actually check the lockfile here
+
     RepositoryName repositoryName = ((BzlmodRepoRuleValue.Key) skyKey).argument();
-    BazelModuleResolutionValue moduleResolution;
+    BazelDepGraphValue moduleResolution;
+
+    // Check if this is a module, else it's module extension
 
     // Look for the repo from Bazel module generated repos.
     try {
@@ -116,7 +120,7 @@ public final class BzlmodRepoRuleFunction implements SkyFunction {
 
       // BazelModuleResolutionValue is affected by repos found in Step 1, therefore it should NOT
       // be requested in Step 1 to avoid cycle dependency.
-      moduleResolution = (BazelModuleResolutionValue) env.getValue(BazelModuleResolutionValue.KEY);
+      moduleResolution = (BazelDepGraphValue) env.getValue(BazelDepGraphValue.KEY);
       if (env.valuesMissing()) {
         return null;
       }
@@ -170,7 +174,7 @@ public final class BzlmodRepoRuleFunction implements SkyFunction {
   }
 
   private Optional<RepoSpec> checkRepoFromBazelModules(
-      BazelModuleResolutionValue bazelModuleResolutionValue,
+      BazelDepGraphValue bazelModuleResolutionValue,
       ImmutableMap<String, ModuleOverride> overrides,
       ExtendedEventHandler eventListener,
       RepositoryName repositoryName)

@@ -25,6 +25,7 @@ import com.google.devtools.build.lib.analysis.ConfiguredRuleClassProvider;
 import com.google.devtools.build.lib.analysis.ServerDirectories;
 import com.google.devtools.build.lib.analysis.config.BuildOptions;
 import com.google.devtools.build.lib.analysis.util.AnalysisMock;
+import com.google.devtools.build.lib.bazel.bzlmod.BazelDepGraphFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleResolutionFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.FakeRegistry;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleFileFunction;
@@ -366,9 +367,9 @@ public abstract class SkyframeQueryHelper extends AbstractQueryHelper<Target> {
                         BazelModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES,
                         CheckDirectDepsMode.WARNING),
                     PrecomputedValue.injected(
-                        BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
+                        BazelDepGraphFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
                     PrecomputedValue.injected(
-                        BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE,
+                        BazelDepGraphFunction.BAZEL_COMPATIBILITY_MODE,
                         BazelCompatibilityMode.ERROR)))
             .setEnvironmentExtensions(getEnvironmentExtensions())
             .build(ruleClassProvider, fileSystem);
@@ -407,11 +408,10 @@ public abstract class SkyframeQueryHelper extends AbstractQueryHelper<Target> {
                     CheckDirectDepsMode.WARNING))
             .add(
                 PrecomputedValue.injected(
-                    BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()))
+                    BazelDepGraphFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()))
             .add(
                 PrecomputedValue.injected(
-                    BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE,
-                    BazelCompatibilityMode.ERROR))
+                    BazelDepGraphFunction.BAZEL_COMPATIBILITY_MODE, BazelCompatibilityMode.ERROR))
             .build());
     SkyframeExecutorTestHelper.process(skyframeExecutor);
     return skyframeExecutor;
