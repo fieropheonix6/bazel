@@ -87,7 +87,7 @@ java_library(
         "AbridgedModule.java",
         "ArchiveOverride.java",
         "BazelModuleResolutionValue.java",
-        "BazelModuleSelectionValue.java",
+        "FullModuleResolutionValue.java",
         "GitOverride.java",
         "LocalPathOverride.java",
         "Module.java",
@@ -128,7 +128,7 @@ java_library(
     name = "resolution_impl",
     srcs = [
         "BazelModuleResolutionFunction.java",
-        "BazelModuleSelectionFunction.java",
+        "FullModuleResolutionFunction.java",
         "Discovery.java",
         "ModuleExtensionContext.java",
         "ModuleFileFunction.java",

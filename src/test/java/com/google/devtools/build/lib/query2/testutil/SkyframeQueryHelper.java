@@ -26,7 +26,7 @@ import com.google.devtools.build.lib.analysis.ServerDirectories;
 import com.google.devtools.build.lib.analysis.config.BuildOptions;
 import com.google.devtools.build.lib.analysis.util.AnalysisMock;
 import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleResolutionFunction;
-import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleSelectionFunction;
+import com.google.devtools.build.lib.bazel.bzlmod.FullModuleResolutionFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.FakeRegistry;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleFileFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleKey;
@@ -364,7 +364,7 @@ public abstract class SkyframeQueryHelper extends AbstractQueryHelper<Target> {
                         ModuleFileFunction.REGISTRIES, ImmutableList.of(registry.getUrl())),
                     PrecomputedValue.injected(ModuleFileFunction.IGNORE_DEV_DEPS, false),
                     PrecomputedValue.injected(
-                        BazelModuleSelectionFunction.CHECK_DIRECT_DEPENDENCIES,
+                        FullModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES,
                         CheckDirectDepsMode.WARNING),
                     PrecomputedValue.injected(
                         BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
@@ -404,7 +404,7 @@ public abstract class SkyframeQueryHelper extends AbstractQueryHelper<Target> {
             .add(PrecomputedValue.injected(ModuleFileFunction.IGNORE_DEV_DEPS, false))
             .add(
                 PrecomputedValue.injected(
-                    BazelModuleSelectionFunction.CHECK_DIRECT_DEPENDENCIES,
+                    FullModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES,
                     CheckDirectDepsMode.WARNING))
             .add(
                 PrecomputedValue.injected(

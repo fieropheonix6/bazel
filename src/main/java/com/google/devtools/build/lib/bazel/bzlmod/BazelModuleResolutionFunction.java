@@ -85,8 +85,15 @@ public class BazelModuleResolutionFunction implements SkyFunction {
     if (root == null) {
       return null;
     }
-    BazelModuleSelectionValue selectionResult =
-        (BazelModuleSelectionValue) env.getValue(BazelModuleSelectionValue.KEY);
+
+    /* //TODO lockfile
+      - Get lock file hash of input
+      - If root hash is equal to lock file hash, return result from lock file
+      else complete
+    */
+
+    FullModuleResolutionValue selectionResult =
+        (FullModuleResolutionValue) env.getValue(FullModuleResolutionValue.KEY);
     if (env.valuesMissing()) {
       return null;
     }
@@ -103,7 +110,12 @@ public class BazelModuleResolutionFunction implements SkyFunction {
             allowedYankedVersionsFromEnv.getValue(),
             Objects.requireNonNull(ALLOWED_YANKED_VERSIONS.get(env))),
         env.getListener());
-    
+
+    /* //TODO lockfile
+      Reaching here means lockfile is empty or didn't match the input
+      we need to updated its hash input: root
+      and output: selectionResult
+     */
     return createValue(resolvedDepGraph);
   }
 

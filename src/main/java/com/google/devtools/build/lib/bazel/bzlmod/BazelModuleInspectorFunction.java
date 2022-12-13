@@ -49,8 +49,8 @@ public class BazelModuleInspectorFunction implements SkyFunction {
     if (root == null) {
       return null;
     }
-    BazelModuleSelectionValue selectionValue =
-        (BazelModuleSelectionValue) env.getValue(BazelModuleSelectionValue.KEY);
+    FullModuleResolutionValue selectionValue =
+        (FullModuleResolutionValue) env.getValue(FullModuleResolutionValue.KEY);
     if (selectionValue == null) {
       return null;
     }

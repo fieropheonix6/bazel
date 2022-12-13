@@ -118,7 +118,7 @@ public class BazelModuleResolutionFunctionTest extends FoundationTestCase {
                     new ModuleFileFunction(registryFactory, rootDirectory, ImmutableMap.of()))
                 .put(SkyFunctions.PRECOMPUTED, new PrecomputedFunction())
                 .put(SkyFunctions.BAZEL_MODULE_RESOLUTION, new BazelModuleResolutionFunction())
-                .put(SkyFunctions.BAZEL_MODULE_SELECTION, new BazelModuleSelectionFunction())
+                .put(SkyFunctions.FULL_MODULE_RESOLUTION, new FullModuleResolutionFunction())
                 .put(
                     SkyFunctions.CLIENT_ENVIRONMENT_VARIABLE,
                     new ClientEnvironmentFunction(new AtomicReference<>(ImmutableMap.of())))
@@ -130,7 +130,7 @@ public class BazelModuleResolutionFunctionTest extends FoundationTestCase {
         StarlarkSemantics.builder().setBool(BuildLanguageOptions.ENABLE_BZLMOD, true).build());
     ModuleFileFunction.IGNORE_DEV_DEPS.set(differencer, false);
     ModuleFileFunction.MODULE_OVERRIDES.set(differencer, ImmutableMap.of());
-    BazelModuleSelectionFunction.CHECK_DIRECT_DEPENDENCIES.set(
+    FullModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES.set(
         differencer, CheckDirectDepsMode.OFF);
     BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE.set(
         differencer, BazelCompatibilityMode.ERROR);

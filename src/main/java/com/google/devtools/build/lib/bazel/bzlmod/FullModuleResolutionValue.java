@@ -28,13 +28,13 @@ import com.google.devtools.build.skyframe.SkyValue;
  * graphs.
  */
 @AutoValue
-abstract class BazelModuleSelectionValue implements SkyValue {
+abstract class FullModuleResolutionValue implements SkyValue {
     /* TODO(andreisolo): Also load the modules overridden by {@code single_version_override} or
         NonRegistryOverride if we need to detect changes in the dependency graph caused by them.
     */
 
   @SerializationConstant
-  public static final SkyKey KEY = () -> SkyFunctions.BAZEL_MODULE_SELECTION;
+  public static final SkyKey KEY = () -> SkyFunctions.FULL_MODULE_RESOLUTION;
 
   /** Final dep graph sorted in BFS iteration order, with unused modules removed. */
   abstract ImmutableMap<ModuleKey, Module> getResolvedDepGraph();
@@ -47,9 +47,9 @@ abstract class BazelModuleSelectionValue implements SkyValue {
    */
   abstract ImmutableMap<ModuleKey, Module> getUnprunedDepGraph();
 
-  static BazelModuleSelectionValue create(
+  static FullModuleResolutionValue create(
       ImmutableMap<ModuleKey, Module> resolvedDepGraph,
       ImmutableMap<ModuleKey, Module> unprunedDepGraph) {
-    return new AutoValue_BazelModuleSelectionValue(resolvedDepGraph, unprunedDepGraph);
+    return new AutoValue_FullModuleResolutionValue(resolvedDepGraph, unprunedDepGraph);
   }
 }

@@ -103,8 +103,12 @@ public final class BzlmodRepoRuleFunction implements SkyFunction {
       return null;
     }
 
+    //TODO we can actually check the lockfile here
+
     RepositoryName repositoryName = ((BzlmodRepoRuleValue.Key) skyKey).argument();
     BazelModuleResolutionValue moduleResolution;
+
+    //Check if this is a module, else it's module extension
 
     // Look for the repo from Bazel module generated repos.
     try {

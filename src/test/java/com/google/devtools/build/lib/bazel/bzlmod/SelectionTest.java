@@ -52,7 +52,7 @@ public class SelectionTest {
             .put(ModuleBuilder.create("ddd", "2.0", 1).buildEntry())
             .buildOrThrow();
 
-    BazelModuleSelectionValue selectionResult = Selection.run(depGraph, /*overrides=*/ ImmutableMap.of());
+    FullModuleResolutionValue selectionResult = Selection.run(depGraph, /*overrides=*/ ImmutableMap.of());
     assertThat(selectionResult.getResolvedDepGraph().entrySet())
         .containsExactly(
             ModuleBuilder.create("aaa", Version.EMPTY)
@@ -116,7 +116,7 @@ public class SelectionTest {
             .put(ModuleBuilder.create("eee", "1.0").buildEntry())
             .build();
 
-    BazelModuleSelectionValue selectionResult = Selection.run(depGraph, /*overrides=*/ ImmutableMap.of());
+    FullModuleResolutionValue selectionResult = Selection.run(depGraph, /*overrides=*/ ImmutableMap.of());
     assertThat(selectionResult.getResolvedDepGraph().entrySet())
         .containsExactly(
             ModuleBuilder.create("aaa", Version.EMPTY)
@@ -179,7 +179,7 @@ public class SelectionTest {
             .put(ModuleBuilder.create("ddd", "1.0").buildEntry())
             .buildOrThrow();
 
-    BazelModuleSelectionValue selectionResult = Selection.run(depGraph, /*overrides=*/ ImmutableMap.of());
+    FullModuleResolutionValue selectionResult = Selection.run(depGraph, /*overrides=*/ ImmutableMap.of());
     assertThat(selectionResult.getResolvedDepGraph().entrySet())
         .containsExactly(
             ModuleBuilder.create("aaa", Version.EMPTY)
@@ -286,7 +286,7 @@ public class SelectionTest {
     //       \-> ccc 1.1
     //        \-> ddd 1.0 -> bbb 1.1
     //         \-> eee 1.0 -> ccc 1.1
-    BazelModuleSelectionValue selectionResult = Selection.run(depGraph, /*overrides=*/ ImmutableMap.of());
+    FullModuleResolutionValue selectionResult = Selection.run(depGraph, /*overrides=*/ ImmutableMap.of());
     assertThat(selectionResult.getResolvedDepGraph().entrySet())
         .containsExactly(
             ModuleBuilder.create("aaa", "1.0")
@@ -383,7 +383,7 @@ public class SelectionTest {
             MultipleVersionOverride.create(
                 ImmutableList.of(Version.parse("1.0"), Version.parse("2.0")), ""));
 
-    BazelModuleSelectionValue selectionResult = Selection.run(depGraph, overrides);
+    FullModuleResolutionValue selectionResult = Selection.run(depGraph, overrides);
     assertThat(selectionResult.getResolvedDepGraph().entrySet())
         .containsExactly(
             ModuleBuilder.create("aaa", Version.EMPTY)
@@ -456,7 +456,7 @@ public class SelectionTest {
             MultipleVersionOverride.create(
                 ImmutableList.of(Version.parse("1.0"), Version.parse("2.0")), ""));
 
-    BazelModuleSelectionValue selectionResult = Selection.run(depGraph, overrides);
+    FullModuleResolutionValue selectionResult = Selection.run(depGraph, overrides);
     assertThat(selectionResult.getResolvedDepGraph().entrySet())
         .containsExactly(
             ModuleBuilder.create("aaa", Version.EMPTY)
@@ -505,7 +505,7 @@ public class SelectionTest {
             MultipleVersionOverride.create(
                 ImmutableList.of(Version.parse("1.0"), Version.parse("2.0")), ""));
 
-    BazelModuleSelectionValue selectionResult = Selection.run(depGraph, overrides);
+    FullModuleResolutionValue selectionResult = Selection.run(depGraph, overrides);
     assertThat(selectionResult.getResolvedDepGraph().entrySet())
         .containsExactly(
             ModuleBuilder.create("aaa", Version.EMPTY)
@@ -583,7 +583,7 @@ public class SelectionTest {
     //     \-> bbb3@1.0 -> ccc@1.7  [originally ccc@1.5]
     //     \-> bbb4@1.0 -> ccc@1.7  [allowed]
     //     \-> bbb5@1.0 -> ccc@2.0  [allowed]
-    BazelModuleSelectionValue selectionResult = Selection.run(depGraph, overrides);
+    FullModuleResolutionValue selectionResult = Selection.run(depGraph, overrides);
     assertThat(selectionResult.getResolvedDepGraph().entrySet())
         .containsExactly(
             ModuleBuilder.create("aaa", Version.EMPTY)
@@ -796,7 +796,7 @@ public class SelectionTest {
     //     \            \-> bbb4@1.1
     //     \-> bbb4@1.1
     // ccc@1.5 and ccc@3.0, the versions violating the allowlist, are gone.
-    BazelModuleSelectionValue selectionResult = Selection.run(depGraph, overrides);
+    FullModuleResolutionValue selectionResult = Selection.run(depGraph, overrides);
     assertThat(selectionResult.getResolvedDepGraph().entrySet())
         .containsExactly(
             ModuleBuilder.create("aaa", Version.EMPTY)

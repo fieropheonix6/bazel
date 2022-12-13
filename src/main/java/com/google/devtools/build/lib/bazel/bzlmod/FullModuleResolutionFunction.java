@@ -32,10 +32,9 @@ import javax.annotation.Nullable;
 
 /**
  * Runs Bazel module resolution. This function produces the dependency graph containing all Bazel
- * modules, along with a few lookup maps that help with further usage. By this stage, module
- * extensions are not evaluated yet.
+ * modules, along with a few lookup maps that help with further usage.
  */
-public class BazelModuleSelectionFunction implements SkyFunction {
+public class FullModuleResolutionFunction implements SkyFunction {
 
   public static final Precomputed<CheckDirectDepsMode> CHECK_DIRECT_DEPENDENCIES =
       new Precomputed<>("check_direct_dependency");
@@ -55,7 +54,7 @@ public class BazelModuleSelectionFunction implements SkyFunction {
       return null;
     }
 
-    BazelModuleSelectionValue selectionResultValue;
+    FullModuleResolutionValue selectionResultValue;
     try {
       selectionResultValue = Selection.run(initialDepGraph, root.getOverrides());
     } catch (ExternalDepsException e) {
