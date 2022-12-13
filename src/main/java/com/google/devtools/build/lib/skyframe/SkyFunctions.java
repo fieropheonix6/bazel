@@ -151,6 +151,8 @@ public final class SkyFunctions {
       SkyFunctionName.createHermetic("SINGLE_EXTENSION_USAGES");
   public static final SkyFunctionName SINGLE_EXTENSION_EVAL =
       SkyFunctionName.createNonHermetic("SINGLE_EXTENSION_EVAL");
+  public static final SkyFunctionName BAZEL_MODULE_SELECTION =
+      SkyFunctionName.createNonHermetic("BAZEL_MODULE_SELECTION");
 
   public static Predicate<SkyKey> isSkyFunction(SkyFunctionName functionName) {
     return key -> key.functionName().equals(functionName);
