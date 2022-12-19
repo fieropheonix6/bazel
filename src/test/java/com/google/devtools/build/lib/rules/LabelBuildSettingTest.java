@@ -54,11 +54,11 @@ public class LabelBuildSettingTest extends BuildViewTestCase {
         PrecomputedValue.injected(ModuleFileFunction.IGNORE_DEV_DEPS, false),
         PrecomputedValue.injected(ModuleFileFunction.MODULE_OVERRIDES, ImmutableMap.of()),
         PrecomputedValue.injected(
-            BazelDepGraphFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
+            BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
         PrecomputedValue.injected(
             BazelModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES, CheckDirectDepsMode.WARNING),
         PrecomputedValue.injected(
-            BazelDepGraphFunction.BAZEL_COMPATIBILITY_MODE, BazelCompatibilityMode.ERROR));
+            BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE, BazelCompatibilityMode.ERROR));
   }
 
   private void writeRulesBzl(String type) throws Exception {

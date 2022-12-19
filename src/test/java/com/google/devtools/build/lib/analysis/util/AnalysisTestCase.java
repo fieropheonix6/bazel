@@ -239,9 +239,9 @@ public abstract class AnalysisTestCase extends FoundationTestCase {
                         BazelModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES,
                         CheckDirectDepsMode.WARNING),
                     PrecomputedValue.injected(
-                        BazelDepGraphFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
+                        BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
                     PrecomputedValue.injected(
-                        BazelDepGraphFunction.BAZEL_COMPATIBILITY_MODE,
+                        BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE,
                         BazelCompatibilityMode.ERROR)))
             .build(ruleClassProvider, fileSystem);
     useConfiguration();
@@ -287,9 +287,9 @@ public abstract class AnalysisTestCase extends FoundationTestCase {
                 BazelModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES,
                 CheckDirectDepsMode.WARNING),
             PrecomputedValue.injected(
-                BazelDepGraphFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
+                BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
             PrecomputedValue.injected(
-                BazelDepGraphFunction.BAZEL_COMPATIBILITY_MODE, BazelCompatibilityMode.WARNING)));
+                BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE, BazelCompatibilityMode.WARNING)));
   }
 
   /** Resets the SkyframeExecutor, as if a clean had been executed. */

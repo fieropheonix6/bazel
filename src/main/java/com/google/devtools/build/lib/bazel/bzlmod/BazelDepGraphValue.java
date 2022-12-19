@@ -34,7 +34,7 @@ import java.util.Map;
 @AutoValue
 public abstract class BazelDepGraphValue implements SkyValue {
   @SerializationConstant
-  public static final SkyKey KEY = () -> SkyFunctions.BAZEL_MODULE_RESOLUTION;
+  public static final SkyKey KEY = () -> SkyFunctions.BAZEL_DEP_GRAPH;
 
   public static BazelDepGraphValue create(
       ImmutableMap<ModuleKey, Module> depGraph,
