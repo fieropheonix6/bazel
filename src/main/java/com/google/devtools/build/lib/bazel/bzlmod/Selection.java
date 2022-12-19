@@ -166,7 +166,7 @@ final class Selection {
   }
 
   /**
-   * Runs module selection (aka version resolution). Returns a {@link FullModuleResolutionValue}.
+   * Runs module selection (aka version resolution). Returns a {@link BazelModuleResolutionValue}.
    */
   public static BazelModuleResolutionValue run(
       ImmutableMap<ModuleKey, Module> depGraph, ImmutableMap<String, ModuleOverride> overrides)

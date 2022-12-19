@@ -51,7 +51,6 @@ import com.google.devtools.build.lib.analysis.configuredtargets.InputFileConfigu
 import com.google.devtools.build.lib.analysis.starlark.StarlarkTransition;
 import com.google.devtools.build.lib.bazel.bzlmod.BazelDepGraphFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleResolutionFunction;
-import com.google.devtools.build.lib.bazel.bzlmod.FullModuleResolutionFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.FakeRegistry;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleFileFunction;
 import com.google.devtools.build.lib.bazel.repository.RepositoryOptions.BazelCompatibilityMode;
@@ -237,7 +236,7 @@ public abstract class AnalysisTestCase extends FoundationTestCase {
                     PrecomputedValue.injected(
                         ModuleFileFunction.MODULE_OVERRIDES, ImmutableMap.of()),
                     PrecomputedValue.injected(
-                        FullModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES,
+                        BazelModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES,
                         CheckDirectDepsMode.WARNING),
                     PrecomputedValue.injected(
                         BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
@@ -285,7 +284,7 @@ public abstract class AnalysisTestCase extends FoundationTestCase {
                 ModuleFileFunction.REGISTRIES, ImmutableList.of(registry.getUrl())),
             PrecomputedValue.injected(ModuleFileFunction.IGNORE_DEV_DEPS, false),
             PrecomputedValue.injected(
-                FullModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES,
+                BazelModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES,
                 CheckDirectDepsMode.WARNING),
             PrecomputedValue.injected(
                 BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),

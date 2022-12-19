@@ -22,9 +22,7 @@ import static org.junit.Assert.fail;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.analysis.util.BuildViewTestCase;
-import com.google.devtools.build.lib.bazel.bzlmod.BazelDepGraphFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleResolutionFunction;
-import com.google.devtools.build.lib.bazel.bzlmod.FullModuleResolutionFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.FakeRegistry;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleFileFunction;
 import com.google.devtools.build.lib.bazel.repository.RepositoryOptions.BazelCompatibilityMode;
@@ -110,7 +108,7 @@ public class BzlLoadFunctionTest extends BuildViewTestCase {
         PrecomputedValue.injected(
             BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
         PrecomputedValue.injected(
-            FullModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES, CheckDirectDepsMode.WARNING),
+            ResolutionFunction.CHECK_DIRECT_DEPENDENCIES, CheckDirectDepsMode.WARNING),
         PrecomputedValue.injected(
             BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE, BazelCompatibilityMode.ERROR));
   }

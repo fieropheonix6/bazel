@@ -26,7 +26,6 @@ import com.google.common.truth.IterableSubject;
 import com.google.devtools.build.lib.analysis.ViewCreationFailedException;
 import com.google.devtools.build.lib.analysis.platform.ConstraintCollection;
 import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleResolutionFunction;
-import com.google.devtools.build.lib.bazel.bzlmod.FullModuleResolutionFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.FakeRegistry;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleFileFunction;
 import com.google.devtools.build.lib.bazel.repository.RepositoryOptions.BazelCompatibilityMode;
@@ -109,7 +108,7 @@ public class RegisteredExecutionPlatformsFunctionTest extends ToolchainTestCase 
         PrecomputedValue.injected(
             BazelModuleResolutionFunction.ALLOWED_YANKED_VERSIONS, ImmutableList.of()),
         PrecomputedValue.injected(
-            FullModuleResolutionFunction.CHECK_DIRECT_DEPENDENCIES, CheckDirectDepsMode.WARNING),
+            ResolutionFunction.CHECK_DIRECT_DEPENDENCIES, CheckDirectDepsMode.WARNING),
         PrecomputedValue.injected(
             BazelModuleResolutionFunction.BAZEL_COMPATIBILITY_MODE, BazelCompatibilityMode.ERROR));
   }
