@@ -316,7 +316,7 @@ public final class CppConfiguration extends Fragment
   @StarlarkConfigurationField(
       name = "cc_toolchain",
       doc = "The label of the target describing the C++ toolchain",
-      defaultLabel = "//tools/cpp:crosstool",
+      defaultLabel = "//tools/cpp:toolchain",
       defaultInToolRepository = true)
   public Label getRuleProvidingCcToolchainProvider() {
     return cppOptions.crosstoolTop;
@@ -882,6 +882,7 @@ public final class CppConfiguration extends Fragment
     return generateLlvmLCov();
   }
 
+  @Nullable
   @Override
   public String fdoInstrumentStarlark(StarlarkThread thread) throws EvalException {
     checkInExpandedApiAllowlist(thread, "fdo_instrument");

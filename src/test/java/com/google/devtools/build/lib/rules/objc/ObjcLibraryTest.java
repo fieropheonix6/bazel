@@ -899,19 +899,15 @@ public class ObjcLibraryTest extends ObjcRuleTestCase {
     assertThat(archiveAction.getArguments())
         .isEqualTo(
             ImmutableList.of(
-                "tools/osx/crosstool/iossim/libtool",
-                "-static",
-                "-filelist",
-                getBinArtifact("lib-archive.objlist", getConfiguredTarget("//objc:lib"))
+                "tools/osx/crosstool/iossim/ar_wrapper",
+                "rcs",
+                Iterables.getOnlyElement(archiveAction.getOutputs()).getExecPathString(),
+                getBinArtifact("_objs/lib/arc/a.o", getConfiguredTarget("//objc:lib"))
                     .getExecPathString(),
-                "-arch_only",
-                "i386",
-                "-syslibroot",
-                AppleToolchain.sdkDir(),
-                "-o",
-                Iterables.getOnlyElement(archiveAction.getOutputs()).getExecPathString()));
+                getBinArtifact("_objs/lib/arc/b.o", getConfiguredTarget("//objc:lib"))
+                    .getExecPathString()));
     assertThat(baseArtifactNames(archiveAction.getInputs()))
-        .containsAtLeast("a.o", "b.o", "lib-archive.objlist", "ar", "libempty.a", "libtool");
+        .containsAtLeast("a.o", "b.o", "ar", "libempty.a", "libtool");
     assertThat(baseArtifactNames(archiveAction.getOutputs())).containsExactly("liblib.a");
     assertRequiresDarwin(archiveAction);
   }
@@ -928,19 +924,14 @@ public class ObjcLibraryTest extends ObjcRuleTestCase {
     assertThat(archiveAction.getArguments())
         .isEqualTo(
             ImmutableList.of(
-                "tools/osx/crosstool/ios/libtool",
-                "-static",
-                "-filelist",
-                getBinArtifact("lib-archive.objlist", getConfiguredTarget("//objc:lib"))
+                "tools/osx/crosstool/ios/ar_wrapper",
+                "rcs",
+                Iterables.getOnlyElement(archiveAction.getOutputs()).getExecPathString(),
+                getBinArtifact("_objs/lib/arc/a.o", getConfiguredTarget("//objc:lib"))
                     .getExecPathString(),
-                "-arch_only",
-                "armv7",
-                "-syslibroot",
-                AppleToolchain.sdkDir(),
-                "-o",
-                Iterables.getOnlyElement(archiveAction.getOutputs()).getExecPathString()));
-    assertThat(baseArtifactNames(archiveAction.getInputs()))
-        .containsAtLeast("a.o", "b.o", "lib-archive.objlist");
+                getBinArtifact("_objs/lib/arc/b.o", getConfiguredTarget("//objc:lib"))
+                    .getExecPathString()));
+    assertThat(baseArtifactNames(archiveAction.getInputs())).containsAtLeast("a.o", "b.o");
     assertThat(baseArtifactNames(archiveAction.getOutputs())).containsExactly("liblib.a");
     assertRequiresDarwin(archiveAction);
   }
@@ -1164,19 +1155,6 @@ public class ObjcLibraryTest extends ObjcRuleTestCase {
   @Test
   public void testPopulatesCompilationArtifacts() throws Exception {
     checkPopulatesCompilationArtifacts(RULE_TYPE);
-  }
-
-  @Test
-  public void testObjcListFileInArchiveGeneration() throws Exception {
-    scratch.file("lib/a.m");
-    scratch.file("lib/b.m");
-    scratch.file("lib/BUILD", "objc_library(name = 'lib1', srcs = ['a.m', 'b.m'])");
-    ConfiguredTarget target = getConfiguredTarget("//lib:lib1");
-    Artifact lib = getBinArtifact("liblib1.a", target);
-    Action action = getGeneratingAction(lib);
-    assertThat(paramFileArgsForAction(action))
-        .containsExactlyElementsIn(
-            Artifact.toExecPaths(inputsEndingWith(archiveAction("//lib:lib1"), ".o")));
   }
 
   @Test
@@ -1482,19 +1460,15 @@ public class ObjcLibraryTest extends ObjcRuleTestCase {
     // for creating binaries but is ignored for libraries.
     CommandAction archiveAction = archiveAction("//depender_lib:lib");
     assertThat(archiveAction.getArguments())
-        .containsAtLeastElementsIn(
-            new ImmutableList.Builder<String>()
-                .add("-static")
-                .add("-filelist")
-                .add(
-                    getBinArtifact("lib-archive.objlist", getConfiguredTarget("//depender_lib:lib"))
-                        .getExecPathString())
-                .add("-arch_only", "x86_64")
-                .add("-syslibroot")
-                .add(AppleToolchain.sdkDir())
-                .add("-o")
-                .addAll(Artifact.toExecPaths(archiveAction.getOutputs()))
-                .build());
+        .isEqualTo(
+            ImmutableList.of(
+                "tools/osx/crosstool/mac/ar_wrapper",
+                "rcs",
+                Iterables.getOnlyElement(archiveAction.getOutputs()).getExecPathString(),
+                getBinArtifact("_objs/lib/arc/a.o", getConfiguredTarget("//depender_lib:lib"))
+                    .getExecPathString(),
+                getBinArtifact("_objs/lib/arc/b.o", getConfiguredTarget("//depender_lib:lib"))
+                    .getExecPathString()));
   }
 
   @Test
@@ -2217,7 +2191,7 @@ public class ObjcLibraryTest extends ObjcRuleTestCase {
         "        compilation_outputs=compilation_outputs,",
         "        name = ctx.label.name,",
         "        cc_toolchain=toolchain,",
-        "        language='objc'",
+        "        language='c++'",
         "    )",
         "    files_to_build = []",
         "    files_to_build.extend(compilation_outputs.pic_objects)",
@@ -2533,6 +2507,30 @@ public class ObjcLibraryTest extends ObjcRuleTestCase {
         getConfiguredTarget("//a:lib").get(InstrumentedFilesInfo.STARLARK_CONSTRUCTOR);
 
     assertThat(instrumentedFilesInfo.getCoverageSupportFiles().toList()).isEmpty();
+  }
+
+  @Test
+  public void testCoverageMetadataFiles() throws Exception {
+    scratch.file(
+        "a/BUILD",
+        "cc_toolchain_alias(name = 'toolchain')",
+        "objc_library(",
+        "    name = 'foo',",
+        "    srcs = ['foo.m'],",
+        ")",
+        "objc_library(",
+        "     name = 'bar',",
+        "     srcs = ['bar.m'],",
+        "     deps = [':foo'],",
+        ")");
+    useConfiguration("--collect_code_coverage", "--instrumentation_filter=//a[:/]");
+
+    InstrumentedFilesInfo instrumentedFilesInfo =
+        getConfiguredTarget("//a:bar").get(InstrumentedFilesInfo.STARLARK_CONSTRUCTOR);
+
+    assertThat(
+            Artifact.toRootRelativePaths(instrumentedFilesInfo.getInstrumentationMetadataFiles()))
+        .containsExactly("a/_objs/foo/arc/foo.gcno", "a/_objs/bar/arc/bar.gcno");
   }
 
   private ImmutableList<String> getCcInfoUserLinkFlagsFromTarget(String target)
