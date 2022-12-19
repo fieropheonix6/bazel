@@ -86,6 +86,7 @@ java_library(
     srcs = [
         "AbridgedModule.java",
         "ArchiveOverride.java",
+        "BazelDepGraphValue.java",
         "BazelModuleResolutionValue.java",
         "FullModuleResolutionValue.java",
         "GitOverride.java",
@@ -127,6 +128,7 @@ java_library(
 java_library(
     name = "resolution_impl",
     srcs = [
+        "BazelDepGraphFunction.java",
         "BazelModuleResolutionFunction.java",
         "FullModuleResolutionFunction.java",
         "Discovery.java",

@@ -20,7 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.analysis.BlazeDirectories;
-import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleResolutionValue;
+import com.google.devtools.build.lib.bazel.bzlmod.BazelDepGraphValue;
 import com.google.devtools.build.lib.bazel.bzlmod.BzlmodRepoRuleCreator;
 import com.google.devtools.build.lib.bazel.bzlmod.BzlmodRepoRuleValue;
 import com.google.devtools.build.lib.bazel.bzlmod.ModuleExtensionId;
@@ -103,12 +103,12 @@ public final class BzlmodRepoRuleFunction implements SkyFunction {
       return null;
     }
 
-    //TODO we can actually check the lockfile here
+    // TODO we can actually check the lockfile here
 
     RepositoryName repositoryName = ((BzlmodRepoRuleValue.Key) skyKey).argument();
-    BazelModuleResolutionValue moduleResolution;
+    BazelDepGraphValue bazelDepGraphValue;
 
-    //Check if this is a module, else it's module extension
+    // Check if this is a module, else it's module extension
 
     // Look for the repo from Bazel module generated repos.
     try {
@@ -118,9 +118,9 @@ public final class BzlmodRepoRuleFunction implements SkyFunction {
         return createRuleFromSpec(repoSpec.get(), starlarkSemantics, env);
       }
 
-      // BazelModuleResolutionValue is affected by repos found in Step 1, therefore it should NOT
+      // BazelDepGraphValue is affected by repos found in Step 1, therefore it should NOT
       // be requested in Step 1 to avoid cycle dependency.
-      moduleResolution = (BazelModuleResolutionValue) env.getValue(BazelModuleResolutionValue.KEY);
+      bazelDepGraphValue = (BazelDepGraphValue) env.getValue(BazelDepGraphValue.KEY);
       if (env.valuesMissing()) {
         return null;
       }
@@ -128,7 +128,7 @@ public final class BzlmodRepoRuleFunction implements SkyFunction {
       // Step 2: Look for repositories derived from Bazel Modules.
       repoSpec =
           checkRepoFromBazelModules(
-              moduleResolution, root.getOverrides(), env.getListener(), repositoryName);
+              bazelDepGraphValue, root.getOverrides(), env.getListener(), repositoryName);
       if (repoSpec.isPresent()) {
         return createRuleFromSpec(repoSpec.get(), starlarkSemantics, env);
       }
@@ -138,7 +138,7 @@ public final class BzlmodRepoRuleFunction implements SkyFunction {
 
     // Otherwise, look for the repo from module extension evaluation results.
     Optional<ModuleExtensionId> extensionId =
-        moduleResolution.getExtensionUniqueNames().entrySet().stream()
+        bazelDepGraphValue.getExtensionUniqueNames().entrySet().stream()
             .filter(e -> repositoryName.getName().startsWith(e.getValue() + "~"))
             .map(Entry::getKey)
             .findFirst();
@@ -174,18 +174,18 @@ public final class BzlmodRepoRuleFunction implements SkyFunction {
   }
 
   private Optional<RepoSpec> checkRepoFromBazelModules(
-      BazelModuleResolutionValue bazelModuleResolutionValue,
+      BazelDepGraphValue bazelDepGraphValue,
       ImmutableMap<String, ModuleOverride> overrides,
       ExtendedEventHandler eventListener,
       RepositoryName repositoryName)
       throws InterruptedException, IOException {
     ModuleKey moduleKey =
-        bazelModuleResolutionValue.getCanonicalRepoNameLookup().get(repositoryName);
+        bazelDepGraphValue.getCanonicalRepoNameLookup().get(repositoryName);
     if (moduleKey == null) {
       return Optional.empty();
     }
     com.google.devtools.build.lib.bazel.bzlmod.Module module =
-        bazelModuleResolutionValue.getDepGraph().get(moduleKey);
+        bazelDepGraphValue.getDepGraph().get(moduleKey);
     Registry registry = checkNotNull(module.getRegistry());
     RepoSpec repoSpec = registry.getRepoSpec(moduleKey, repositoryName, eventListener);
     repoSpec = maybeAppendAdditionalPatches(repoSpec, overrides.get(moduleKey.getName()));

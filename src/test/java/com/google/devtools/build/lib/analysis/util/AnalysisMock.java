@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.analysis.BlazeDirectories;
 import com.google.devtools.build.lib.analysis.ConfiguredRuleClassProvider;
+import com.google.devtools.build.lib.bazel.bzlmod.BazelDepGraphFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.BazelModuleResolutionFunction;
 import com.google.devtools.build.lib.bazel.bzlmod.FakeRegistry;
 import com.google.devtools.build.lib.bazel.bzlmod.FullModuleResolutionFunction;
@@ -141,6 +142,8 @@ public abstract class AnalysisMock extends LoadingMock {
             FakeRegistry.DEFAULT_FACTORY,
             directories.getWorkspace(),
             getBuiltinModules(directories)),
+        SkyFunctions.BAZEL_DEP_GRAPH,
+        new BazelDepGraphFunction(),
         SkyFunctions.BAZEL_MODULE_RESOLUTION,
         new BazelModuleResolutionFunction(),
         SkyFunctions.FULL_MODULE_RESOLUTION,

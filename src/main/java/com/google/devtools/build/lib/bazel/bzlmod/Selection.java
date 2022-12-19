@@ -165,8 +165,10 @@ final class Selection {
         allowedVersionSet.ceiling(module.getVersion()));
   }
 
-  /** Runs module selection (aka version resolution). Returns a {@link FullModuleResolutionValue}. */
-  public static FullModuleResolutionValue run(
+  /**
+   * Runs module selection (aka version resolution). Returns a {@link FullModuleResolutionValue}.
+   */
+  public static BazelModuleResolutionValue run(
       ImmutableMap<ModuleKey, Module> depGraph, ImmutableMap<String, ModuleOverride> overrides)
       throws ExternalDepsException {
     // For any multiple-version overrides, build a mapping from (moduleName, compatibilityLevel) to
@@ -226,7 +228,7 @@ final class Selection {
         new DepGraphWalker(newDepGraph, overrides, selectionGroups).walk();
 
     // Return the result containing both the pruned and un-pruned dep graphs
-    return FullModuleResolutionValue.create(prunedDepGraph, unprunedDepGraph);
+    return BazelModuleResolutionValue.create(prunedDepGraph, unprunedDepGraph);
   }
 
   /**

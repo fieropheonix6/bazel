@@ -49,14 +49,14 @@ public class BazelModuleInspectorFunction implements SkyFunction {
     if (root == null) {
       return null;
     }
-    FullModuleResolutionValue selectionValue =
-        (FullModuleResolutionValue) env.getValue(FullModuleResolutionValue.KEY);
-    if (selectionValue == null) {
+    BazelModuleResolutionValue resolutionValue =
+        (BazelModuleResolutionValue) env.getValue(BazelModuleResolutionValue.KEY);
+    if (resolutionValue == null) {
       return null;
     }
     ImmutableMap<String, ModuleOverride> overrides = root.getOverrides();
-    ImmutableMap<ModuleKey, Module> unprunedDepGraph = selectionValue.getUnprunedDepGraph();
-    ImmutableMap<ModuleKey, Module> resolvedDepGraph = selectionValue.getResolvedDepGraph();
+    ImmutableMap<ModuleKey, Module> unprunedDepGraph = resolutionValue.getUnprunedDepGraph();
+    ImmutableMap<ModuleKey, Module> resolvedDepGraph = resolutionValue.getResolvedDepGraph();
 
     ImmutableMap<ModuleKey, AugmentedModule> depGraph =
         computeAugmentedGraph(unprunedDepGraph, resolvedDepGraph.keySet(), overrides);
