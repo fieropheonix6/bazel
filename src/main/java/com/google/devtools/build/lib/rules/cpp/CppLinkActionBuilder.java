@@ -353,7 +353,11 @@ public class CppLinkActionBuilder {
    * the associated ThinLTO link will utilize LTO indexing (therefore unique LTO backend actions),
    * or not (and therefore the library being linked will create a set of shared LTO backends).
    */
-  private LtoBackendArtifacts createLtoArtifact(
+  private static LtoBackendArtifacts createLtoArtifact(
+      LinkActionConstruction linkActionConstruction,
+      FeatureConfiguration featureConfiguration,
+      CcToolchainProvider toolchain,
+      boolean usePicForLtoBackendActions,
       Artifact bitcodeFile,
       @Nullable BitcodeFiles allBitcode,
       PathFragment ltoOutputRootPrefix,
@@ -382,13 +386,15 @@ public class CppLinkActionBuilder {
         localLinkActionConstruction,
         featureConfiguration,
         toolchain,
-        fdoContext,
+        toolchain.getFdoContext(),
         usePicForLtoBackendActions,
-        CcToolchainProvider.shouldCreatePerObjectDebugInfo(featureConfiguration, cppConfiguration),
+        CcToolchainProvider.shouldCreatePerObjectDebugInfo(
+            featureConfiguration, toolchain.getCppConfiguration()),
         argv);
   }
 
-  private ImmutableList<String> collectPerFileLtoBackendOpts(Artifact objectFile) {
+  private static ImmutableList<String> collectPerFileLtoBackendOpts(
+      CppConfiguration cppConfiguration, Artifact objectFile) {
     return cppConfiguration.getPerFileLtoBackendOpts().stream()
         .filter(perLabelOptions -> perLabelOptions.isIncluded(objectFile))
         .map(PerLabelOptions::getOptions)
@@ -396,17 +402,23 @@ public class CppLinkActionBuilder {
         .collect(ImmutableList.toImmutableList());
   }
 
-  private List<String> getLtoBackendUserCompileFlags(
-      Artifact objectFile, ImmutableList<String> copts) {
+  private static List<String> getLtoBackendUserCompileFlags(
+      CppConfiguration cppConfiguration, Artifact objectFile, ImmutableList<String> copts) {
     List<String> argv = new ArrayList<>();
     argv.addAll(cppConfiguration.getLinkopts());
     argv.addAll(copts);
     argv.addAll(cppConfiguration.getLtoBackendOptions());
-    argv.addAll(collectPerFileLtoBackendOpts(objectFile));
+    argv.addAll(collectPerFileLtoBackendOpts(cppConfiguration, objectFile));
     return argv;
   }
 
-  private Iterable<LtoBackendArtifacts> createLtoArtifacts(
+  public static ImmutableList<LtoBackendArtifacts> createLtoArtifacts(
+      LinkActionConstruction linkActionConstruction,
+      LtoCompilationContext ltoCompilationContext,
+      FeatureConfiguration featureConfiguration,
+      CcToolchainProvider toolchain,
+      boolean usePicForLtoBackendActions,
+      Set<LegacyLinkerInput> objectFiles,
       PathFragment ltoOutputRootPrefix,
       PathFragment ltoObjRootPrefix,
       NestedSet<LibraryInput> uniqueLibraries,
@@ -437,7 +449,7 @@ public class CppLinkActionBuilder {
       }
     }
     for (LegacyLinkerInput input : objectFiles) {
-      if (this.ltoCompilationContext.containsBitcodeFile(input.getArtifact())) {
+      if (ltoCompilationContext.containsBitcodeFile(input.getArtifact())) {
         allBitcode.add(input.getArtifact());
       }
     }
@@ -459,9 +471,15 @@ public class CppLinkActionBuilder {
           if (includeLinkStaticInLtoIndexing) {
             List<String> backendUserCompileFlags =
                 getLtoBackendUserCompileFlags(
-                    objectFile, lib.getLtoCompilationContext().getCopts(objectFile));
+                    toolchain.getCppConfiguration(),
+                    objectFile,
+                    lib.getLtoCompilationContext().getCopts(objectFile));
             LtoBackendArtifacts ltoArtifacts =
                 createLtoArtifact(
+                    linkActionConstruction,
+                    featureConfiguration,
+                    toolchain,
+                    usePicForLtoBackendActions,
                     objectFile,
                     bitcodeFiles,
                     ltoOutputRootPrefix,
@@ -481,12 +499,18 @@ public class CppLinkActionBuilder {
       }
     }
     for (LegacyLinkerInput input : objectFiles) {
-      if (this.ltoCompilationContext.containsBitcodeFile(input.getArtifact())) {
+      if (ltoCompilationContext.containsBitcodeFile(input.getArtifact())) {
         List<String> backendUserCompileFlags =
             getLtoBackendUserCompileFlags(
-                input.getArtifact(), this.ltoCompilationContext.getCopts(input.getArtifact()));
+                toolchain.getCppConfiguration(),
+                input.getArtifact(),
+                ltoCompilationContext.getCopts(input.getArtifact()));
         LtoBackendArtifacts ltoArtifacts =
             createLtoArtifact(
+                linkActionConstruction,
+                featureConfiguration,
+                toolchain,
+                usePicForLtoBackendActions,
                 input.getArtifact(),
                 bitcodeFiles,
                 ltoOutputRootPrefix,
@@ -500,10 +524,17 @@ public class CppLinkActionBuilder {
     return ltoOutputs.build();
   }
 
-  private ImmutableMap<Artifact, LtoBackendArtifacts> createSharedNonLtoArtifacts()
+  public static ImmutableMap<Artifact, LtoBackendArtifacts> createSharedNonLtoArtifacts(
+      LinkActionConstruction linkActionConstruction,
+      LtoCompilationContext ltoCompilationContext,
+      boolean isLinker,
+      FeatureConfiguration featureConfiguration,
+      CcToolchainProvider toolchain,
+      boolean usePicForLtoBackendActions,
+      Set<LegacyLinkerInput> objectFiles)
       throws EvalException {
     // Only create the shared LTO artifacts for a statically linked library that has bitcode files.
-    if (ltoCompilationContext == null || linkType.linkerOrArchiver() != LinkerOrArchiver.ARCHIVER) {
+    if (ltoCompilationContext == null || isLinker) {
       return ImmutableMap.<Artifact, LtoBackendArtifacts>of();
     }
 
@@ -517,12 +548,18 @@ public class CppLinkActionBuilder {
         ImmutableMap.builder();
 
     for (LegacyLinkerInput input : objectFiles) {
-      if (this.ltoCompilationContext.containsBitcodeFile(input.getArtifact())) {
+      if (ltoCompilationContext.containsBitcodeFile(input.getArtifact())) {
         List<String> backendUserCompileFlags =
             getLtoBackendUserCompileFlags(
-                input.getArtifact(), this.ltoCompilationContext.getCopts(input.getArtifact()));
+                toolchain.getCppConfiguration(),
+                input.getArtifact(),
+                ltoCompilationContext.getCopts(input.getArtifact()));
         LtoBackendArtifacts ltoArtifacts =
             createLtoArtifact(
+                linkActionConstruction,
+                featureConfiguration,
+                toolchain,
+                usePicForLtoBackendActions,
                 input.getArtifact(),
                 /* allBitcode= */ null,
                 ltoOutputRootPrefix,
@@ -565,6 +602,7 @@ public class CppLinkActionBuilder {
     }
   }
 
+  // LINT.IfChange
   /**
    * When using this, allLtoArtifacts are stored so the next build() call can emit the real link. Do
    * not call addInput() between the two build() calls.
@@ -609,6 +647,12 @@ public class CppLinkActionBuilder {
     // the LTO indexing step).
     allLtoArtifacts =
         createLtoArtifacts(
+            linkActionConstruction,
+            ltoCompilationContext,
+            featureConfiguration,
+            toolchain,
+            usePicForLtoBackendActions,
+            objectFiles,
             ltoOutputRootPrefix,
             ltoObjRootPrefix,
             libraries.build(),
@@ -703,6 +747,9 @@ public class CppLinkActionBuilder {
         userLinkFlags);
   }
 
+  // LINT.ThenChange(//src/main/starlark/builtins_bzl/common/cc/link/lto_indexing_action.bzl)
+
+  // LINT.IfChange
   /** Builds the Action as configured and returns it. */
   public CppLinkAction build() throws EvalException, InterruptedException {
     Preconditions.checkNotNull(featureConfiguration);
@@ -713,10 +760,6 @@ public class CppLinkActionBuilder {
     Preconditions.checkState(hasIdentifier != isExecutable);
     if (interfaceOutput != null && !linkType.isDynamicLibrary()) {
       throw Starlark.errorf("Interface output can only be used with DYNAMIC_LIBRARY targets");
-    }
-    if (!featureConfiguration.actionIsConfigured(linkType.getActionName())) {
-      throw Starlark.errorf(
-          "Expected action_config for '%s' to be configured", linkType.getActionName());
     }
     if (!featureConfiguration.actionIsConfigured(linkType.getActionName())) {
       throw Starlark.errorf(
@@ -768,7 +811,14 @@ public class CppLinkActionBuilder {
                 linkType.linkerOrArchiver() == LinkerOrArchiver.ARCHIVER
                     ? ltoCompilationContext
                     : LtoCompilationContext.EMPTY,
-                createSharedNonLtoArtifacts(),
+                createSharedNonLtoArtifacts(
+                    linkActionConstruction,
+                    ltoCompilationContext,
+                    linkType.linkerOrArchiver() == LinkerOrArchiver.LINKER,
+                    featureConfiguration,
+                    toolchain,
+                    usePicForLtoBackendActions,
+                    objectFiles),
                 /* mustKeepDebug= */ false);
     interfaceOutputLibrary =
         (interfaceOutput == null)
@@ -823,6 +873,9 @@ public class CppLinkActionBuilder {
         userLinkFlags);
   }
 
+  // LINT.ThenChange(//src/main/starlark/builtins_bzl/common/cc/link/cpp_link_action.bzl)
+
+  // LINT.IfChange
   private CppLinkAction buildLinkAction(
       String actionName,
       String mnemonic,
@@ -933,7 +986,6 @@ public class CppLinkActionBuilder {
     LinkCommandLine.Builder linkCommandLineBuilder =
         new LinkCommandLine.Builder()
             .setActionName(actionName)
-            .setLinkTargetType(linkType)
             .setSplitCommandLine(canSplitCommandLine())
             .setParameterFileType(
                 featureConfiguration.isEnabled(CppRuleClasses.GCC_QUOTING_FOR_PARAM_FILES)
@@ -1048,6 +1100,7 @@ public class CppLinkActionBuilder {
 
       inputsBuilder.addTransitive(linkstampObjectArtifacts);
     }
+    // LINT.ThenChange(//src/main/starlark/builtins_bzl/common/cc/link/finalize_link_action.bzl)
 
     return new CppLinkAction(
         getOwner(),
@@ -1072,6 +1125,7 @@ public class CppLinkActionBuilder {
     return interfaceOutputLibrary;
   }
 
+  // LINT.IfChange
   private static NestedSet<Artifact> getArtifactsPossiblyLtoMapped(
       Iterable<LegacyLinkerInput> inputs, Map<Artifact, Artifact> ltoMapping) {
     Preconditions.checkNotNull(ltoMapping);
@@ -1084,12 +1138,15 @@ public class CppLinkActionBuilder {
     return result.build();
   }
 
+  // LINT.ThenChange(//src/main/starlark/builtins_bzl/common/cc/link/cpp_link_action.bzl)
+
   private boolean shouldUseLinkDynamicLibraryTool() {
     return linkType.isDynamicLibrary()
         && CcToolchainProvider.supportsInterfaceSharedLibraries(featureConfiguration)
         && !featureConfiguration.hasConfiguredLinkerPathInActionConfig();
   }
 
+  // LINT.IfChange
   /** The default heuristic on whether we need to use whole-archive for the link. */
   private static boolean needWholeArchive(
       FeatureConfiguration featureConfiguration,
@@ -1135,6 +1192,9 @@ public class CppLinkActionBuilder {
     return false;
   }
 
+  // LINT.ThenChange(//src/main/starlark/builtins_bzl/common/cc/link/finalize_link_action.bzl)
+
+  // LINT.IfChange
   /**
    * Translates a collection of {@link Linkstamp} instances to an immutable mapping from linkstamp
    * to object files. In other words, given a set of source files, this method determines the output
@@ -1174,6 +1234,8 @@ public class CppLinkActionBuilder {
     }
     return mapBuilder.buildOrThrow();
   }
+
+  // LINT.ThenChange(//src/main/starlark/builtins_bzl/common/cc/link/cpp_link_action.bzl)
 
   protected ActionOwner getOwner() {
     ActionOwner cppLinkExecGroupOwner =

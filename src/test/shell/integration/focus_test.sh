@@ -92,8 +92,8 @@ EOF
 
   expect_log "Focusing on .\+ roots, .\+ leafs"
   expect_log "Rdep edges: .\+ -> .\+"
-  expect_log "Heap: .\+MB -> .\+MB (-.\+%)"
-  expect_log "Node count: .\+ -> .\+ (-.\+%)"
+  expect_log "Heap: .\+MB -> .\+MB"
+  expect_log "Node count: .\+ -> .\+"
 }
 
 function test_focus_command_dump_keys_verbose() {
@@ -187,8 +187,7 @@ EOF
 
   expect_log '"SkyframeFocuser"'
   expect_log '"focus.mark"'
-  expect_log '"focus.sweep_nodes"'
-  expect_log '"focus.sweep_edges"'
+  expect_log '"focus.sweep"'
 }
 
 function test_info_supports_printing_working_set() {

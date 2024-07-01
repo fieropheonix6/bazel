@@ -34,7 +34,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
@@ -175,6 +174,7 @@ import com.google.devtools.build.lib.rules.genquery.GenQueryConfiguration.GenQue
 import com.google.devtools.build.lib.rules.genquery.GenQueryDirectPackageProviderFactory;
 import com.google.devtools.build.lib.rules.repository.ResolvedFileFunction;
 import com.google.devtools.build.lib.runtime.KeepGoingOption;
+import com.google.devtools.build.lib.runtime.MemoryPressureOptions;
 import com.google.devtools.build.lib.server.FailureDetails;
 import com.google.devtools.build.lib.server.FailureDetails.BuildConfiguration.Code;
 import com.google.devtools.build.lib.server.FailureDetails.ExternalRepository;
@@ -308,6 +308,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import net.starlark.java.eval.StarlarkSemantics;
 
@@ -340,7 +341,7 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
   private final FilesMetricConsumer outputArtifactsFromActionCache = new FilesMetricConsumer();
   private final FilesMetricConsumer topLevelArtifactsMetric = new FilesMetricConsumer();
 
-  @Nullable OutputService outputService;
+  @Nullable OutputService outputService; // Null only for non-build commands.
 
   // TODO(bazel-team): Figure out how to handle value builders that block internally. Blocking
   // operations may need to be handled in another (bigger?) thread pool. Also, we should detect
@@ -501,7 +502,7 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
   final class PathResolverFactoryImpl implements PathResolverFactory {
     @Override
     public boolean shouldCreatePathResolverForArtifactValues() {
-      return outputService != null && outputService.supportsPathResolverForArtifactValues();
+      return outputService.supportsPathResolverForArtifactValues();
     }
 
     @Override
@@ -635,7 +636,7 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
             buildFilesByPriority,
             externalPackageHelper));
     map.put(SkyFunctions.CONTAINING_PACKAGE_LOOKUP, new ContainingPackageLookupFunction());
-    map.put(SkyFunctions.PROJECT_DIRECTORIES, new ProjectOwnedCodePathsFunction());
+    map.put(SkyFunctions.PROJECT, new ProjectFunction());
     map.put(SkyFunctions.PROJECT_FILES_LOOKUP, new ProjectFilesLookupFunction());
     map.put(
         SkyFunctions.BZL_COMPILE, // TODO rename
@@ -876,7 +877,7 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
   @ForOverride
   protected abstract void dumpPackages(PrintStream out);
 
-  public void setOutputService(OutputService outputService) {
+  public void setOutputService(@Nullable OutputService outputService) {
     this.outputService = outputService;
   }
 
@@ -1076,20 +1077,6 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
           : GlobbingStrategy.MULTIPLE_GLOB_HYBRID;
     }
     return GlobbingStrategy.NON_SKYFRAME;
-  }
-
-  /**
-   * If not null, this is the only source root in the build, corresponding to the single element in
-   * a single-element package path. Such a single-source-root build need not plant the execroot
-   * symlink forest, and can trivially resolve source artifacts from exec paths. As a consequence,
-   * builds where this is not null do not need to track a package -> source root map. In addition,
-   * such builds can only occur in a monorepo, and thus do not need to produce repo mapping
-   * manifests for runfiles.
-   */
-  // TODO(wyv): To be safe, fail early if we're in a multi-repo setup but this is not being tracked.
-  @Nullable
-  public Root getForcedSingleSourceRootIfNoExecrootSymlinkCreation() {
-    return null;
   }
 
   private boolean shouldStoreTransitivePackagesInLoadingAndAnalysis() {
@@ -1507,17 +1494,22 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
     PathPackageLocator oldLocator = this.pkgLocator.getAndSet(pkgLocator);
     PrecomputedValue.PATH_PACKAGE_LOCATOR.set(injectable(), pkgLocator);
 
-    if (!pkgLocator.equals(oldLocator)) {
+    if (oldLocator != null && !pkgLocator.equals(oldLocator)) {
+      checkState(
+          directories.getVirtualSourceRoot() == null,
+          "Package locator should not change when using a virtual source root (%s -> %s)",
+          oldLocator,
+          pkgLocator);
       // The package path is read not only by SkyFunctions but also by some other code paths.
       // We need to take additional steps to keep the corresponding data structures in sync.
       // (Some of the additional steps are carried out by ConfiguredTargetValueInvalidationListener,
       // and some by BuildView#buildHasIncompatiblePackageRoots and #updateSkyframe.)
-      onPkgLocatorChange(oldLocator, pkgLocator);
+      onPkgLocatorChange();
     }
   }
 
-  protected abstract void onPkgLocatorChange(
-      PathPackageLocator oldLocator, PathPackageLocator pkgLocator);
+  @ForOverride
+  void onPkgLocatorChange() {}
 
   public SkyframeBuildView getSkyframeBuildView() {
     return skyframeBuildView;
@@ -2113,9 +2105,18 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
         getPackageRoots());
   }
 
-  @ForOverride
-  protected PackageRoots getPackageRoots() {
-    return new MapAsPackageRoots(collectPackageRoots());
+  private PackageRoots getPackageRoots() {
+    Root virtualSourceRoot = directories.getVirtualSourceRoot();
+    if (virtualSourceRoot == null) {
+      return new MapAsPackageRoots(collectPackageRoots());
+    }
+
+    // No need to plant symlinks when using virtual roots.
+    // TODO: b/290617036 - Reconsider this for local action support with virtual roots.
+    checkState(
+        !outputService.actionFileSystemType().supportsLocalActions(),
+        "Local actions are incompatible with virtual roots");
+    return new PackageRootsNoSymlinkCreation(virtualSourceRoot);
   }
 
   @Nullable
@@ -2215,7 +2216,7 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
    * done.
    */
   public void clearExecutionStatesSkymeld(ExtendedEventHandler eventHandler) {
-    Preconditions.checkNotNull(watchdog).stop();
+    watchdog.stop();
     watchdog = null;
     cleanUpAfterSingleEvaluationWithActionExecution(eventHandler);
     statusReporterRef.get().unregisterFromEventBus();
@@ -2686,17 +2687,6 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
     PrecomputedValue.ACTION_ENV.set(injectable(), actionEnv);
   }
 
-  public PathPackageLocator createPackageLocator(
-      ExtendedEventHandler eventHandler, List<String> packagePaths, Path workingDirectory) {
-    return PathPackageLocator.create(
-        directories.getOutputBase(),
-        packagePaths,
-        eventHandler,
-        directories.getWorkspace().asFragment(),
-        workingDirectory,
-        buildFilesByPriority);
-  }
-
   private CyclesReporter createCyclesReporter() {
     return new CyclesReporter(
         new TargetCycleReporter(packageManager),
@@ -2740,6 +2730,10 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
   @Nullable
   public PackageProgressReceiver getPackageProgressReceiver() {
     return packageProgress;
+  }
+
+  public final ImmutableList<BuildFileName> getBuildFilesByPriority() {
+    return buildFilesByPriority;
   }
 
   /**
@@ -4012,9 +4006,9 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
     }
 
     reporter.handle(
-        Event.warn(
+        Event.info(
             "--experimental_enable_skyfocus is enabled. "
-                + productName
+                + StringUtilities.capitalize(productName)
                 + " will reclaim memory not needed to build the working set. Run '"
                 + productName
                 + " info working_set' to show the working set."));
@@ -4043,7 +4037,7 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
     }
 
     memoizingEvaluator.rememberTopLevelEvaluations(true);
-    skyfocusState = skyfocusState.withEnabled(true).withOptions(skyfocusOptions);
+    skyfocusState = skyfocusState.toBuilder().enabled(true).options(skyfocusOptions).build();
   }
 
   /**
@@ -4051,20 +4045,30 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
    * focusing is necessary (e.g. new working set, or analysis cache was dropped).
    */
   public final void runSkyfocus(
-      Collection<Label> topLevelTargets,
+      ImmutableSet<Label> topLevelTargets,
       ImmutableSet<PathFragment> projectDirectories,
       Reporter reporter,
-      ActionCache actionCache)
+      @Nullable ActionCache actionCache,
+      OptionsParsingResult options)
       throws InterruptedException {
+    if (!skyfocusState.enabled() || topLevelTargets.isEmpty()) {
+      return;
+    }
+
     int beforeNodeCount = this.getEvaluator().getValues().size();
     long beforeHeap = 0;
-    long beforeActionCacheEntries = actionCache.size();
     if (skyfocusState.options().dumpPostGcStats) {
       // we have to gc once here to get an accurate reading on the exact work Skyfocus is
       // doing.
       System.gc();
-      beforeHeap = getHeapSize();
+      beforeHeap =
+          getHeapSize(
+              options
+                  .getOptions(MemoryPressureOptions.class)
+                  .jvmHeapHistogramInternalObjectPattern
+                  .regexPattern());
     }
+    long beforeActionCacheEntries = actionCache == null ? 0 : actionCache.size();
 
     ImmutableMultiset<SkyFunctionName> skyFunctionCountBefore = ImmutableMultiset.of();
     InMemoryGraph graph = memoizingEvaluator.getInMemoryGraph();
@@ -4073,28 +4077,36 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
       skyFunctionCountBefore = getSkyFunctionNameCount(graph);
     }
 
-    // Run Skyfocus!
-    Pair<FocusResult, SkyfocusState> result =
-        SkyfocusExecutor.prepareWorkingSetAndRunSkyfocus(
+    Optional<SkyfocusState> maybeNewSkyfocusState =
+        SkyfocusExecutor.prepareWorkingSet(
             topLevelTargets,
             projectDirectories,
             (InMemoryMemoizingEvaluator) getEvaluator(),
             skyfocusState,
             packageManager,
             pkgLocator.get(),
-            reporter,
-            actionCache);
+            reporter);
 
-    FocusResult focusResult = result.getFirst();
-    skyfocusState = result.getSecond();
-
-    if (focusResult.equals(FocusResult.NO_RESULT)) {
+    if (maybeNewSkyfocusState.isEmpty()) {
       return;
     }
 
+    SkyfocusState newSkyfocusState = maybeNewSkyfocusState.get();
+
+    // Run Skyfocus!
+    FocusResult focusResult =
+        SkyfocusExecutor.execute(
+            newSkyfocusState.workingSet(),
+            (InMemoryMemoizingEvaluator) getEvaluator(),
+            reporter,
+            actionCache);
+
+    skyfocusState =
+        newSkyfocusState.toBuilder().verificationSet(focusResult.verificationSet()).build();
+
     // Shouldn't result in an empty graph.
-    checkState(!focusResult.deps().isEmpty());
-    checkState(!focusResult.rdeps().isEmpty());
+    checkState(!focusResult.deps().isEmpty(), "FocusResult deps should not be empty");
+    checkState(!focusResult.rdeps().isEmpty(), "FocusResults rdeps should not be empty");
 
     // Now that the graph has dropped nodes, run a GC to reclaim some memory.
     System.gc();
@@ -4105,31 +4117,41 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
     dumpSkyfocusKeys(dumpKeysOption, reporter, focusResult, graph, skyFunctionCountBefore);
 
     if (skyfocusState.options().dumpKeys != SkyfocusDumpOption.NONE) {
-      reportReductions(
+      reportMetricChange(
           reporter,
           "Rdep edges",
           focusResult.rdepEdgesBefore(),
           focusResult.rdepEdgesAfter(),
           Long::toString);
 
-      reportReductions(
+      reportMetricChange(
           reporter,
           "Node count",
           beforeNodeCount,
           memoizingEvaluator.getValues().size(),
           Long::toString);
 
-      reportReductions(
-          reporter,
-          "Action cache count",
-          beforeActionCacheEntries,
-          actionCache.size(),
-          Long::toString);
+      if (actionCache != null) {
+        reportMetricChange(
+            reporter,
+            "Action cache count",
+            beforeActionCacheEntries,
+            actionCache.size(),
+            Long::toString);
+      }
     }
 
     if (skyfocusState.options().dumpPostGcStats) {
-      reportReductions(
-          reporter, "Heap", beforeHeap, getHeapSize(), StringUtilities::prettyPrintBytes);
+      reportMetricChange(
+          reporter,
+          "Heap",
+          beforeHeap,
+          getHeapSize(
+              options
+                  .getOptions(MemoryPressureOptions.class)
+                  .jvmHeapHistogramInternalObjectPattern
+                  .regexPattern()),
+          StringUtilities::prettyPrintBytes);
     }
   }
 
@@ -4141,9 +4163,11 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
    *
    * <p>TODO: b/311665999 - Remove the subtraction of FillerArray once we figure out an alternative.
    */
-  private static long getHeapSize() {
+  private static long getHeapSize(Pattern internalJvmObjectPattern) {
     MemoryMXBean memBean = ManagementFactory.getMemoryMXBean();
-    return memBean.getHeapMemoryUsage().getUsed() - HeapOffsetHelper.getSizeOfFillerArrayOnHeap();
+    return memBean.getHeapMemoryUsage().getUsed()
+        - HeapOffsetHelper.getSizeOfFillerArrayOnHeap(
+            internalJvmObjectPattern, BugReporter.defaultInstance());
   }
 
   /**
@@ -4155,7 +4179,7 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
    * @param after the value after
    * @param valueFormatter the function to format the value
    */
-  private static void reportReductions(
+  private static void reportMetricChange(
       ExtendedEventHandler eventHandler,
       String prefix,
       long before,
@@ -4167,7 +4191,8 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
         String.format(
             "%s: %s -> %s", prefix, valueFormatter.apply(before), valueFormatter.apply(after));
     if (before > 0) {
-      message += String.format(" (-%.2f%%)", (double) (before - after) / before * 100);
+      double change = (double) (before - after) / before * 100;
+      message += String.format(" (%+.2f%%)", -change);
     }
 
     eventHandler.handle(Event.info(message));
@@ -4214,7 +4239,7 @@ public abstract class SkyframeExecutor implements WalkableGraphFactory {
           getSkyFunctionNameCount(graph);
       skyFunctionNameCountsBefore.forEachEntry(
           (entry, beforeCount) ->
-              reportReductions(
+              reportMetricChange(
                   reporter,
                   entry.toString(),
                   beforeCount,

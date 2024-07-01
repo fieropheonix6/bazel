@@ -1,48 +1,10 @@
-## Release 8.0.0-pre.20240523.3 (2024-05-31)
+## Release 7.2.1 (2024-06-25)
 
 ```
-Baseline: 739f7b83e02fb8f17c1a498630c7e02701d83aa1
 
-Cherry picks:
-
-   + cdd104c714dfcdf2661f900ba3c5ebf3616884bb:
-     Do not record events announced after the build-completing event.
-   + b12f536902594e48655c310d62c0bd069484798b:
-     Integrate the skymeld cases into the rewinding inconsistency
-     receiver.
-```
-
-Incompatible changes:
-
-  - The --experimental_aquery_dump_after_build_format and
-    --experimental_aquery_dump_after_build_output_file command line
-    options are not available anymore.
-
-Important changes:
-
-  - Paths in the Linux sandbox are now again identical to those
-    outside the sandbox, even with
-    `--incompatible_sandbox_hermetic_tmp`.
-  - `cc_toolchain` now passes runfiles for its *_files attrs (e.g.
-    data files for a tool built for linking).
-  - `Label` instances passed to `print` or `fail` as positional
-    arguments are now formatted with apparent repository names
-    (optimized for human readability).
-
-This release contains contributions from many people at Google, as well as Fabian Meumertzheim, George Gensure, Greg Magolan, hvd, Isaac Torres, Keith Smiley, oquenchil, Tobias Werth, Tomasz Pasternak, UebelAndre, Xdng Yng.
-
-## Release 8.0.0-pre.20240516.1 (2024-05-21)
+Release Notes:
 
 ```
-Baseline: 9cf8dc6b65f59f954765b9e255810bee43464488
-
-Cherry picks:
-
-   + 8f55a57335e32be12c5d02933e7a6b97a7498664:
-     Update rules_java 7.6.0 / java_tools 13.6.0
-```
-
-Initial release.
 
 ## Release 7.1.2 (2024-05-08)
 

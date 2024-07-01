@@ -66,7 +66,6 @@ import com.google.devtools.build.lib.profiler.ProfilerTask;
 import com.google.devtools.build.lib.repository.ExternalPackageHelper;
 import com.google.devtools.build.lib.skyframe.AspectKeyCreator.AspectKey;
 import com.google.devtools.build.lib.skyframe.ExternalFilesHelper.ExternalFileAction;
-import com.google.devtools.build.lib.skyframe.FilesystemValueChecker.XattrProviderOverrider;
 import com.google.devtools.build.lib.skyframe.PackageFunction.ActionOnIOExceptionReadingBuildFile;
 import com.google.devtools.build.lib.skyframe.PackageLookupFunction.CrossRepositoryLabelViolationStrategy;
 import com.google.devtools.build.lib.skyframe.actiongraph.v2.ActionGraphDump;
@@ -320,7 +319,7 @@ public class SequencedSkyframeExecutor extends SkyframeExecutor {
     return GraphInconsistencyReceiver.THROWING;
   }
 
-  private boolean rewindingEnabled(OptionsProvider options) {
+  private static boolean rewindingEnabled(OptionsProvider options) {
     var buildRequestOptions = options.getOptions(BuildRequestOptions.class);
     return buildRequestOptions != null && buildRequestOptions.rewindLostInputs;
   }
@@ -340,7 +339,7 @@ public class SequencedSkyframeExecutor extends SkyframeExecutor {
           SkyFunctions.TARGET_PATTERN_PHASE);
 
   @Override
-  protected void onPkgLocatorChange(PathPackageLocator oldLocator, PathPackageLocator pkgLocator) {
+  void onPkgLocatorChange() {
     invalidate(SkyFunctionName.functionIsIn(PACKAGE_LOCATOR_DEPENDENT_VALUES));
   }
 
@@ -470,11 +469,9 @@ public class SequencedSkyframeExecutor extends SkyframeExecutor {
         new FilesystemValueChecker(
             Preconditions.checkNotNull(tsgm.get()),
             syscallCache,
-            outputService == null
-                ? XattrProviderOverrider.NO_OVERRIDE
-                : outputService::getXattrProvider,
+            outputService::getXattrProvider,
             fsvcThreads);
-    BatchStat batchStatter = outputService == null ? null : outputService.getBatchStatter();
+    BatchStat batchStatter = outputService.getBatchStatter();
     recordingDiffer.invalidate(
         fsvc.getDirtyActionValues(
             memoizingEvaluator.getValues(),

@@ -31,6 +31,7 @@ import com.google.devtools.build.lib.packages.Types;
 import com.google.devtools.build.lib.rules.apple.AppleConfiguration;
 import com.google.devtools.build.lib.rules.apple.ApplePlatform;
 import com.google.devtools.build.lib.rules.cpp.CcCompilationContext;
+import com.google.devtools.build.lib.rules.cpp.CcLinkingContext;
 import com.google.devtools.build.lib.rules.cpp.CppModuleMap.UmbrellaHeaderStrategy;
 import com.google.devtools.build.lib.rules.objc.IntermediateArtifacts.AlwaysLink;
 import com.google.devtools.build.lib.skyframe.ConfiguredTargetAndData;
@@ -283,6 +284,30 @@ public class ObjcStarlarkInternal implements StarlarkValue {
   }
 
   @StarlarkMethod(
+      name = "subtract_linking_contexts",
+      documented = false,
+      parameters = {
+        @Param(name = "ctx", positional = false, named = true),
+        @Param(name = "linking_contexts", positional = false, defaultValue = "[]", named = true),
+        @Param(
+            name = "avoid_dep_linking_contexts",
+            positional = false,
+            defaultValue = "[]",
+            named = true),
+      })
+  public CcLinkingContext subtractLinkingContexts(
+      StarlarkRuleContext starlarkRuleContext,
+      Sequence<?> linkingContexts,
+      Sequence<?> avoidDepLinkingContexts)
+      throws InterruptedException, EvalException {
+    return MultiArchBinarySupport.ccLinkingContextSubtractSubtrees(
+        starlarkRuleContext.getRuleContext(),
+        Sequence.cast(linkingContexts, CcLinkingContext.class, "linking_contexts"),
+        Sequence.cast(
+            avoidDepLinkingContexts, CcLinkingContext.class, "avoid_dep_linking_contexts"));
+  }
+
+  @StarlarkMethod(
       name = "get_split_target_triplet",
       documented = false,
       parameters = {@Param(name = "ctx", named = true)})
@@ -291,6 +316,7 @@ public class ObjcStarlarkInternal implements StarlarkValue {
     return MultiArchBinarySupport.getSplitTargetTripletFromCtads(
         starlarkRuleContext
             .getRuleContext()
+            .getRulePrerequisitesCollection()
             .getSplitPrerequisites(ObjcRuleClasses.CHILD_CONFIG_ATTR));
   }
 
@@ -303,6 +329,7 @@ public class ObjcStarlarkInternal implements StarlarkValue {
     Map<Optional<String>, List<ConfiguredTargetAndData>> ctads =
         starlarkRuleContext
             .getRuleContext()
+            .getRulePrerequisitesCollection()
             .getSplitPrerequisites(ObjcRuleClasses.CHILD_CONFIG_ATTR);
     Dict.Builder<String, BuildConfigurationValue> result = Dict.builder();
     for (Optional<String> splitTransitionKey : ctads.keySet()) {

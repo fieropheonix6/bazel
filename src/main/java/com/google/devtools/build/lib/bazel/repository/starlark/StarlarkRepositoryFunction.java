@@ -28,11 +28,11 @@ import com.google.devtools.build.lib.analysis.RuleDefinition;
 import com.google.devtools.build.lib.bazel.bzlmod.NonRegistryOverride;
 import com.google.devtools.build.lib.bazel.repository.RepositoryResolvedEvent;
 import com.google.devtools.build.lib.bazel.repository.downloader.DownloadManager;
-import com.google.devtools.build.lib.cmdline.BazelStarlarkContext;
 import com.google.devtools.build.lib.cmdline.Label;
 import com.google.devtools.build.lib.cmdline.LabelConstants;
 import com.google.devtools.build.lib.cmdline.RepositoryMapping;
 import com.google.devtools.build.lib.cmdline.RepositoryName;
+import com.google.devtools.build.lib.cmdline.StarlarkThreadContext;
 import com.google.devtools.build.lib.events.Event;
 import com.google.devtools.build.lib.packages.Rule;
 import com.google.devtools.build.lib.packages.semantics.BuildLanguageOptions;
@@ -260,7 +260,22 @@ public final class StarlarkRepositoryFunction extends RepositoryFunction {
     }
     ImmutableSet<PathFragment> ignoredPatterns = checkNotNull(ignoredPackagesValue).getPatterns();
 
-    try (Mutability mu = Mutability.create("Starlark repository")) {
+    try (Mutability mu = Mutability.create("Starlark repository");
+        StarlarkRepositoryContext starlarkRepositoryContext =
+            new StarlarkRepositoryContext(
+                rule,
+                packageLocator,
+                outputDirectory,
+                ignoredPatterns,
+                env,
+                ImmutableMap.copyOf(clientEnvironment),
+                downloadManager,
+                timeoutScaling,
+                processWrapper,
+                starlarkSemantics,
+                repositoryRemoteExecutor,
+                syscallCache,
+                directories)) {
       StarlarkThread thread =
           StarlarkThread.create(
               mu, starlarkSemantics, /* contextDescription= */ "", SymbolGenerator.create(key));
@@ -275,25 +290,9 @@ public final class StarlarkRepositoryFunction extends RepositoryFunction {
         thread.setThreadLocal(Label.RepoMappingRecorder.class, repoMappingRecorder);
       }
 
-      new BazelStarlarkContext(BazelStarlarkContext.Phase.LOADING, () -> mainRepoMapping)
-          .storeInThread(thread); // "fetch"
-
-      StarlarkRepositoryContext starlarkRepositoryContext =
-          new StarlarkRepositoryContext(
-              rule,
-              packageLocator,
-              outputDirectory,
-              ignoredPatterns,
-              env,
-              ImmutableMap.copyOf(clientEnvironment),
-              downloadManager,
-              timeoutScaling,
-              processWrapper,
-              starlarkSemantics,
-              repositoryRemoteExecutor,
-              syscallCache,
-              directories);
-
+      // We sort of want a starlark thread context here, but no extra info is needed. So we just
+      // use an anonymous class.
+      new StarlarkThreadContext(() -> mainRepoMapping) {}.storeInThread(thread);
       if (starlarkRepositoryContext.isRemotable()) {
         // If a rule is declared remotable then invalidate it if remote execution gets
         // enabled or disabled.
@@ -317,7 +316,6 @@ public final class StarlarkRepositoryFunction extends RepositoryFunction {
       // it possible to return null and not block but it doesn't seem to be easy with Starlark
       // structure as it is.
       Object result;
-      boolean fetchSuccessful = false;
       try (SilentCloseable c =
           Profiler.instance()
               .profile(ProfilerTask.STARLARK_REPOSITORY_FN, () -> rule.getLabel().toString())) {
@@ -325,19 +323,9 @@ public final class StarlarkRepositoryFunction extends RepositoryFunction {
             Starlark.call(
                 thread,
                 function,
-                /*args=*/ ImmutableList.of(starlarkRepositoryContext),
-                /*kwargs=*/ ImmutableMap.of());
-        fetchSuccessful = true;
-      } finally {
-        if (starlarkRepositoryContext.ensureNoPendingAsyncTasks(
-            env.getListener(), fetchSuccessful)) {
-          if (fetchSuccessful) {
-            throw new RepositoryFunctionException(
-                new EvalException(
-                    "Pending asynchronous work after repository rule finished running"),
-                Transience.PERSISTENT);
-          }
-        }
+                /* args= */ ImmutableList.of(starlarkRepositoryContext),
+                /* kwargs= */ ImmutableMap.of());
+        starlarkRepositoryContext.markSuccessful();
       }
 
       RepositoryResolvedEvent resolved =
@@ -367,14 +355,6 @@ public final class StarlarkRepositoryFunction extends RepositoryFunction {
 
       env.getListener().post(resolved);
     } catch (NeedsSkyframeRestartException e) {
-      // A dependency is missing, cleanup and returns null
-      try {
-        if (outputDirectory.exists()) {
-          outputDirectory.deleteTree();
-        }
-      } catch (IOException e1) {
-        throw new RepositoryFunctionException(e1, Transience.TRANSIENT);
-      }
       return null;
     } catch (EvalException e) {
       env.getListener()
@@ -389,6 +369,8 @@ public final class StarlarkRepositoryFunction extends RepositoryFunction {
 
       throw new RepositoryFunctionException(
           new AlreadyReportedRepositoryAccessException(e), Transience.TRANSIENT);
+    } catch (IOException e) {
+      throw new RepositoryFunctionException(e, Transience.TRANSIENT);
     }
 
     if (!outputDirectory.isDirectory()) {

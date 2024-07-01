@@ -4335,7 +4335,8 @@ public final class StarlarkRuleClassFunctionsTest extends BuildViewTestCase {
     getConfiguredTarget("//initializer_testing:my_target");
 
     ev.assertContainsError(
-        "A rule can only be instantiated in a BUILD file, or a macro invoked from a BUILD file");
+        "Cannot instantiate a rule when loading a .bzl file. Rules may be instantiated only in a"
+            + " BUILD thread.");
   }
 
   @Test
@@ -4374,7 +4375,9 @@ public final class StarlarkRuleClassFunctionsTest extends BuildViewTestCase {
     reporter.addHandler(ev.getEventCollector());
     getConfiguredTarget("//initializer_testing:my_target");
 
-    ev.assertContainsError("'native.existing_rules' cannot be called from an initializer");
+    ev.assertContainsError(
+        "existing_rules() can only be used while evaluating a BUILD file, a WORKSPACE file, or a"
+            + " macro loaded from there");
   }
 
   @Test
@@ -5048,6 +5051,69 @@ public final class StarlarkRuleClassFunctionsTest extends BuildViewTestCase {
             rule.getRuleClassObject().getAttributeByName("tool").getAspectClasses().stream()
                 .map(AspectClass::toString))
         .containsExactly("//extend_rule_testing:child.bzl%my_aspect");
+  }
+
+  @Test
+  public void testAspectWithInvalidToolchainsAspects_fails() throws Exception {
+    scratch.file(
+        "pkg/def.bzl",
+        """
+        def _aspect_impl(target, ctx):
+            return []
+        my_aspect = aspect(
+            implementation = _aspect_impl,
+            toolchains_aspects = ["@:invalid_toolchain_label"]
+        )
+
+        def _rule_impl(ctx):
+            pass
+        my_rule = rule(
+            implementation = _rule_impl,
+            attrs = {"deps": attr.label_list(aspects = [my_aspect])})
+        """);
+    scratch.file(
+        "pkg/BUILD",
+        """
+        load(":def.bzl", "my_rule")
+        my_rule(
+            name = "t1",
+            deps = [":t2"],
+        )
+        my_rule(
+            name = "t2",
+        )
+        """);
+
+    reporter.removeHandler(failFastHandler);
+    ConfiguredTarget target = getConfiguredTarget("//pkg:t1");
+
+    assertThat(target).isNull();
+    assertContainsEvent(
+        "Error in aspect: Unable to parse label '@:invalid_toolchain_label' in attribute"
+            + " 'toolchains_aspects'");
+  }
+
+  @Test
+  public void testAspectWithValidToolchainsAspects_parsesCorrectly() throws Exception {
+    evalAndExport(
+        ev,
+        """
+        def _aspect_impl(target, ctx):
+            return []
+        my_aspect = aspect(
+            implementation = _aspect_impl,
+            toolchains_aspects = ["//toolchains:type1", "//toolchains:type2", "//toolchains:type2"]
+        )
+
+        """);
+
+    StarlarkDefinedAspect aspect = (StarlarkDefinedAspect) ev.lookup("my_aspect");
+    assertThat(aspect).isNotNull();
+    assertThat(aspect.getToolchainsAspects()).hasSize(2);
+    assertThat(aspect.getToolchainsAspects())
+        .containsExactly(
+            Label.parseCanonicalUnchecked("//toolchains:type1"),
+            Label.parseCanonicalUnchecked("//toolchains:type2"));
   }
 
   @Test

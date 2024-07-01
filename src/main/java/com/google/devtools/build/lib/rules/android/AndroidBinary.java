@@ -382,13 +382,8 @@ public abstract class AndroidBinary implements RuleConfiguredTargetFactory {
             ruleContext, dataContext, manifest);
 
     Artifact manifestValidation = null;
-    boolean shouldValidateMultidex =
-        (Allowlist.hasAllowlist(ruleContext, "android_multidex_native_min_sdk_allowlist")
-            && !Allowlist.isAvailable(ruleContext, "android_multidex_native_min_sdk_allowlist")
-            && getMultidexMode(ruleContext) == MultidexMode.NATIVE);
     boolean shouldValidateMinSdk = getMinSdkVersion(ruleContext) > 0;
-    if (ruleContext.isAttrDefined("$validate_manifest", LABEL)
-        && (shouldValidateMultidex || shouldValidateMinSdk)) {
+    if (ruleContext.isAttrDefined("$validate_manifest", LABEL) && shouldValidateMinSdk) {
       manifestValidation =
           ruleContext.getPackageRelativeArtifact(
               ruleContext.getLabel().getName() + "_manifest_validation_output",
@@ -404,8 +399,6 @@ public abstract class AndroidBinary implements RuleConfiguredTargetFactory {
                   CustomCommandLine.builder()
                       .addExecPath("--manifest", manifest.getManifest())
                       .addExecPath("--output", manifestValidation)
-                      .addFormatted(
-                          "--validate_multidex=%s", Boolean.toString(shouldValidateMultidex))
                       .add(
                           "--expected_min_sdk_version",
                           Integer.toString(getMinSdkVersion(ruleContext)))
@@ -982,7 +975,8 @@ public abstract class AndroidBinary implements RuleConfiguredTargetFactory {
         attr -> !"deps".equals(attr),
         validations -> builder.addOutputGroup(OutputGroupInfo.VALIDATION_TRANSITIVE, validations));
     boolean filterSplitValidations = false; // propagate validations from first split unfiltered
-    for (List<ConfiguredTargetAndData> deps : ruleContext.getSplitPrerequisites("deps").values()) {
+    for (List<ConfiguredTargetAndData> deps :
+        ruleContext.getRulePrerequisitesCollection().getSplitPrerequisites("deps").values()) {
       for (OutputGroupInfo provider :
           AnalysisUtils.getProviders(
               getConfiguredTargets(deps), OutputGroupInfo.STARLARK_CONSTRUCTOR)) {
@@ -1050,7 +1044,8 @@ public abstract class AndroidBinary implements RuleConfiguredTargetFactory {
     // libraries across multiple architectures, e.g. x86 and armeabi-v7a, and need to be packed
     // into the APK.
     NestedSetBuilder<Artifact> transitiveNativeLibs = NestedSetBuilder.naiveLinkOrder();
-    for (List<ConfiguredTargetAndData> deps : ruleContext.getSplitPrerequisites("deps").values()) {
+    for (List<ConfiguredTargetAndData> deps :
+        ruleContext.getRulePrerequisitesCollection().getSplitPrerequisites("deps").values()) {
       for (AndroidNativeLibsInfo provider :
           AnalysisUtils.getProviders(getConfiguredTargets(deps), AndroidNativeLibsInfo.PROVIDER)) {
         transitiveNativeLibs.addTransitive(provider.getNativeLibs());

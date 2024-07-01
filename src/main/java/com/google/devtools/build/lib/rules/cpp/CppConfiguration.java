@@ -357,6 +357,13 @@ public final class CppConfiguration extends Fragment
     return ltoindexOptions;
   }
 
+  @StarlarkMethod(name = "lto_index_options", documented = false, useStarlarkThread = true)
+  public ImmutableList<String> getLtoIndexOptionsForStarlark(StarlarkThread thread)
+      throws EvalException {
+    CcModule.checkPrivateStarlarkificationAllowlist(thread);
+    return ltoindexOptions;
+  }
+
   /** Returns the set of command-line LTO backend options. */
   public ImmutableList<String> getLtoBackendOptions() {
     return ltobackendOptions;
@@ -513,7 +520,22 @@ public final class CppConfiguration extends Fragment
     return cppOptions.legacyWholeArchive;
   }
 
+  @StarlarkMethod(name = "legacy_whole_archive", documented = false, useStarlarkThread = true)
+  public boolean legacyWholeArchiveForStarlark(StarlarkThread thread) throws EvalException {
+    CcModule.checkPrivateStarlarkificationAllowlist(thread);
+    return cppOptions.legacyWholeArchive;
+  }
+
   public boolean removeLegacyWholeArchive() {
+    return cppOptions.removeLegacyWholeArchive;
+  }
+
+  @StarlarkMethod(
+      name = "incompatible_remove_legacy_whole_archive",
+      documented = false,
+      useStarlarkThread = true)
+  public boolean removeLegacyWholeArchiveForStarlark(StarlarkThread thread) throws EvalException {
+    CcModule.checkPrivateStarlarkificationAllowlist(thread);
     return cppOptions.removeLegacyWholeArchive;
   }
 
@@ -522,6 +544,13 @@ public final class CppConfiguration extends Fragment
   }
 
   public boolean getUseInterfaceSharedLibraries() {
+    return cppOptions.useInterfaceSharedObjects;
+  }
+
+  @StarlarkMethod(name = "interface_shared_objects", documented = false, useStarlarkThread = true)
+  public boolean getUseInterfaceSharedLibrariesforStarlark(StarlarkThread thread)
+      throws EvalException {
+    CcModule.checkPrivateStarlarkificationAllowlist(thread);
     return cppOptions.useInterfaceSharedObjects;
   }
 
@@ -823,6 +852,15 @@ public final class CppConfiguration extends Fragment
     return cppOptions.useSpecificToolFiles;
   }
 
+  @StarlarkMethod(
+      name = "incompatible_use_specific_tool_files",
+      documented = false,
+      useStarlarkThread = true)
+  public boolean useSpecificToolFilesForStarlark(StarlarkThread thread) throws EvalException {
+    CcModule.checkPrivateStarlarkificationAllowlist(thread);
+    return cppOptions.useSpecificToolFiles;
+  }
+
   public boolean disableNoCopts() {
     return cppOptions.disableNoCopts;
   }
@@ -886,8 +924,18 @@ public final class CppConfiguration extends Fragment
     return experimentalCcImplementationDeps();
   }
 
+  @StarlarkMethod(name = "experimental_cpp_modules", documented = false, useStarlarkThread = true)
+  public boolean experimentalCppModulesForStarlark(StarlarkThread thread) throws EvalException {
+    CcModule.checkPrivateStarlarkificationAllowlist(thread);
+    return experimentalCppModules();
+  }
+
   public boolean experimentalCcImplementationDeps() {
     return cppOptions.experimentalCcImplementationDeps;
+  }
+
+  public boolean experimentalCppModules() {
+    return cppOptions.experimentalCppModules;
   }
 
   public boolean getExperimentalCppCompileResourcesEstimation() {
@@ -902,7 +950,7 @@ public final class CppConfiguration extends Fragment
   private static void checkInExpandedApiAllowlist(StarlarkThread thread, String feature)
       throws EvalException {
     try {
-      BuiltinRestriction.failIfCalledOutsideBuiltins(thread);
+      BuiltinRestriction.failIfCalledOutsideDefaultAllowlist(thread);
     } catch (EvalException e) {
       throw Starlark.errorf("%s (feature '%s' in CppConfiguration)", e.getMessage(), feature);
     }

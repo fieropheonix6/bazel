@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.devtools.build.lib.actions.Artifact;
+import com.google.devtools.build.lib.actions.PathMapper;
 import com.google.devtools.build.lib.analysis.AnalysisUtils;
 import com.google.devtools.build.lib.analysis.RuleContext;
 import com.google.devtools.build.lib.analysis.config.BuildConfigurationValue;
@@ -134,20 +135,6 @@ public abstract class CcModule
   private static final ImmutableList<String> SUPPORTED_OUTPUT_TYPES =
       ImmutableList.of("executable", "dynamic_library", "archive");
 
-  private static final ImmutableList<BuiltinRestriction.AllowlistEntry>
-      PRIVATE_STARLARKIFICATION_ALLOWLIST =
-          ImmutableList.of(
-              BuiltinRestriction.allowlistEntry("", "bazel_internal/test_rules/cc"),
-              BuiltinRestriction.allowlistEntry("", "tools/build_defs/android"),
-              BuiltinRestriction.allowlistEntry("", "third_party/bazel_rules/rules_android"),
-              BuiltinRestriction.allowlistEntry(
-                  "", "rust/private"),
-              BuiltinRestriction.allowlistEntry("", "third_party/crubit"),
-              BuiltinRestriction.allowlistEntry("build_bazel_rules_android", ""),
-              BuiltinRestriction.allowlistEntry("rules_android", ""),
-              BuiltinRestriction.allowlistEntry("rules_rust", "rust/private"),
-              BuiltinRestriction.allowlistEntry("", "third_party/gpus/cuda"));
-
   // TODO(bazel-team): This only makes sense for the parameter in cc_common.compile()
   //  additional_include_scanning_roots which is technical debt and should go away.
   private static final BuiltinRestriction.AllowlistEntry MATCH_CLIF_ALLOWLISTED_LOCATION =
@@ -232,6 +219,7 @@ public abstract class CcModule
     }
   }
 
+  // TODO(blaze-team): duplicate with the getExecutionRequirements below
   @Override
   public Sequence<String> getToolRequirementForAction(
       FeatureConfigurationForStarlark featureConfiguration,
@@ -287,7 +275,7 @@ public abstract class CcModule
     return Dict.immutableCopyOf(
         featureConfiguration
             .getFeatureConfiguration()
-            .getEnvironmentVariables(actionName, variables));
+            .getEnvironmentVariables(actionName, variables, PathMapper.NOOP));
   }
 
   @Override
@@ -1939,7 +1927,7 @@ public abstract class CcModule
 
   public static void checkPrivateStarlarkificationAllowlist(StarlarkThread thread)
       throws EvalException {
-    BuiltinRestriction.failIfCalledOutsideAllowlist(thread, PRIVATE_STARLARKIFICATION_ALLOWLIST);
+    BuiltinRestriction.failIfCalledOutsideDefaultAllowlist(thread);
   }
 
   public static boolean isStarlarkCcCommonCalledFromBuiltins(StarlarkThread thread) {
@@ -1977,8 +1965,8 @@ public abstract class CcModule
             }),
       })
   public void checkPrivateApi(Object allowlistObject, StarlarkThread thread) throws EvalException {
-    // Make sure that check_private_api is called either from builtins or allowlisted packages.
-    isCalledFromStarlarkCcCommon(thread);
+    // This method may be called anywhere from builtins, but not outside (because it's not exposed
+    // in cc_common.bzl
     BazelModuleContext bazelModuleContext =
         (BazelModuleContext) Module.ofInnermostEnclosingStarlarkFunction(thread, 1).getClientData();
     ImmutableList<BuiltinRestriction.AllowlistEntry> allowlist =
@@ -2062,6 +2050,7 @@ public abstract class CcModule
       Object purposeObject,
       Object coptsFilterObject,
       Object separateModuleHeadersObject,
+      Sequence<?> moduleInterfacesUnchecked, // <Artifact> expected
       Object nonCompilationAdditionalInputsObject,
       StarlarkThread thread)
       throws EvalException, InterruptedException {
@@ -2150,23 +2139,37 @@ public abstract class CcModule
                 configuration.getFragment(CppConfiguration.class)));
     boolean tuple =
         (!sourcesUnchecked.isEmpty() && sourcesUnchecked.get(0) instanceof Tuple)
+            || (!moduleInterfacesUnchecked.isEmpty()
+                && moduleInterfacesUnchecked.get(0) instanceof Tuple)
             || (!publicHeadersUnchecked.isEmpty() && publicHeadersUnchecked.get(0) instanceof Tuple)
             || (!privateHeadersUnchecked.isEmpty()
                 && privateHeadersUnchecked.get(0) instanceof Tuple);
     if (tuple) {
       ImmutableList<Pair<Artifact, Label>> sources = convertSequenceTupleToPair(sourcesUnchecked);
+      ImmutableList<Pair<Artifact, Label>> moduleInterfaces =
+          convertSequenceTupleToPair(moduleInterfacesUnchecked);
       ImmutableList<Pair<Artifact, Label>> publicHeaders =
           convertSequenceTupleToPair(publicHeadersUnchecked);
       ImmutableList<Pair<Artifact, Label>> privateHeaders =
           convertSequenceTupleToPair(privateHeadersUnchecked);
-      helper.addPublicHeaders(publicHeaders).addPrivateHeaders(privateHeaders).addSources(sources);
+      helper
+          .addPublicHeaders(publicHeaders)
+          .addPrivateHeaders(privateHeaders)
+          .addSources(sources)
+          .addModuleInterfaceSources(moduleInterfaces);
     } else {
       List<Artifact> sources = Sequence.cast(sourcesUnchecked, Artifact.class, "srcs");
+      List<Artifact> moduleInterfaces =
+          Sequence.cast(moduleInterfacesUnchecked, Artifact.class, "module_interfaces");
       List<Artifact> publicHeaders =
           Sequence.cast(publicHeadersUnchecked, Artifact.class, "public_hdrs");
       List<Artifact> privateHeaders =
           Sequence.cast(privateHeadersUnchecked, Artifact.class, "private_hdrs");
-      helper.addPublicHeaders(publicHeaders).addPrivateHeaders(privateHeaders).addSources(sources);
+      helper
+          .addPublicHeaders(publicHeaders)
+          .addPrivateHeaders(privateHeaders)
+          .addSources(sources)
+          .addModuleInterfaceSources(moduleInterfaces);
     }
 
     List<String> includes =
@@ -2534,6 +2537,25 @@ public abstract class CcModule
             named = true),
         @Param(name = "label_replacement", documented = false, positional = false, named = true),
         @Param(name = "output_replacement", documented = false, positional = false, named = true),
+        @Param(
+            name = "needs_pic",
+            documented = false,
+            positional = false,
+            named = true,
+            defaultValue = "False"),
+        @Param(
+            name = "stamping",
+            documented = false,
+            positional = false,
+            named = true,
+            defaultValue = "None"),
+        @Param(
+            name = "additional_linkstamp_defines",
+            positional = false,
+            named = true,
+            documented = false,
+            allowedTypes = {@ParamType(type = Sequence.class, generic1 = String.class)},
+            defaultValue = "unbound"),
       })
   public void registerLinkstampCompileAction(
       StarlarkActionFactory starlarkActionFactoryApi,
@@ -2545,11 +2567,17 @@ public abstract class CcModule
       Depset inputsForValidation,
       String labelReplacement,
       String outputReplacement,
+      boolean needsPic,
+      Object stampingObject,
+      Object additionalLinkstampDefines,
       StarlarkThread thread)
       throws EvalException, InterruptedException, TypeException, RuleErrorException {
     isCalledFromStarlarkCcCommon(thread);
     RuleContext ruleContext = starlarkActionFactoryApi.getRuleContext();
-
+    boolean stamping =
+        stampingObject instanceof Boolean
+            ? (Boolean) stampingObject
+            : AnalysisUtils.isStampingEnabled(ruleContext, ruleContext.getConfiguration());
     CcToolchainProvider ccToolchain =
         CcToolchainProvider.PROVIDER.wrapOrThrowEvalException(ccToolchainInfo);
     CppConfiguration cppConfiguration = ccToolchain.getCppConfiguration();
@@ -2570,7 +2598,7 @@ public abstract class CcModule
             compilationInputs.getSet(Artifact.class),
             /* nonCodeInputs= */ NestedSetBuilder.emptySet(Order.STABLE_ORDER),
             inputsForValidation.getSet(Artifact.class),
-            AnalysisUtils.isStampingEnabled(ruleContext, ruleContext.getConfiguration())
+            stamping
                 ? ccToolchain
                     .getCcBuildInfoTranslator()
                     .getOutputGroup("non_redacted_build_info_files")
@@ -2579,7 +2607,7 @@ public abstract class CcModule
                     .getCcBuildInfoTranslator()
                     .getOutputGroup("redacted_build_info_files")
                     .toList(),
-            /* additionalLinkstampDefines= */ ImmutableList.of(),
+            asStringImmutableList(additionalLinkstampDefines),
             ccToolchain,
             ruleContext.getConfiguration().isCodeCoverageEnabled(),
             CppHelper.getFdoBuildStamp(
@@ -2587,7 +2615,7 @@ public abstract class CcModule
                 ccToolchain.getFdoContext(),
                 featureConfigurationForStarlark.getFeatureConfiguration()),
             featureConfigurationForStarlark.getFeatureConfiguration(),
-            /* needsPic= */ false,
+            needsPic,
             labelReplacement,
             outputReplacement,
             getSemantics()));

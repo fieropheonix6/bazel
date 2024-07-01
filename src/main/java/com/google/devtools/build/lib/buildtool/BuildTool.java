@@ -66,7 +66,7 @@ import com.google.devtools.build.lib.server.FailureDetails.ActionQuery;
 import com.google.devtools.build.lib.server.FailureDetails.BuildConfiguration.Code;
 import com.google.devtools.build.lib.server.FailureDetails.FailureDetail;
 import com.google.devtools.build.lib.skyframe.BuildResultListener;
-import com.google.devtools.build.lib.skyframe.ProjectOwnedCodePathsValue;
+import com.google.devtools.build.lib.skyframe.ProjectValue;
 import com.google.devtools.build.lib.skyframe.RepositoryMappingValue.RepositoryMappingResolutionException;
 import com.google.devtools.build.lib.skyframe.SequencedSkyframeExecutor;
 import com.google.devtools.build.lib.skyframe.SkyframeBuildView.BuildDriverKeyTestContext;
@@ -295,7 +295,8 @@ public class BuildTool {
                 topLevelTargets,
                 projectDirectories,
                 env.getReporter(),
-                env.getBlazeWorkspace().getPersistentActionCache());
+                env.getBlazeWorkspace().getPersistentActionCache(),
+                env.getOptions());
       }
     }
   }
@@ -332,7 +333,11 @@ public class BuildTool {
       if (projectFile != null) {
         postFlagSetsBuildOptions =
             applySclConfigs(
-                buildOptionsBeforeFlagSets, projectFile, env.getSkyframeExecutor(), getReporter());
+                buildOptionsBeforeFlagSets,
+                projectFile,
+                request.getBuildOptions().enforceProjectConfigs,
+                env.getSkyframeExecutor(),
+                getReporter());
       } else {
         postFlagSetsBuildOptions = buildOptionsBeforeFlagSets;
       }
@@ -816,7 +821,7 @@ public class BuildTool {
   private static ImmutableSet<PathFragment> getProjectDirectories(
       Label projectFile, SkyframeExecutor skyframeExecutor, ExtendedEventHandler eventHandler)
       throws InvalidConfigurationException {
-    ProjectOwnedCodePathsValue.Key key = new ProjectOwnedCodePathsValue.Key(projectFile);
+    ProjectValue.Key key = new ProjectValue.Key(projectFile);
     EvaluationResult<SkyValue> result =
         skyframeExecutor.evaluateSkyKeys(
             eventHandler, ImmutableList.of(key), /* keepGoing= */ false);
@@ -829,7 +834,7 @@ public class BuildTool {
           Code.INVALID_PROJECT);
     }
 
-    return ((ProjectOwnedCodePathsValue) result.get(key))
+    return ((ProjectValue) result.get(key))
         .getOwnedCodePaths().stream().map(PathFragment::create).collect(toImmutableSet());
   }
 
@@ -837,13 +842,18 @@ public class BuildTool {
   public static BuildOptions applySclConfigs(
       BuildOptions buildOptionsBeforeFlagSets,
       Label projectFile,
+      boolean enforceCanonicalConfigs,
       SkyframeExecutor skyframeExecutor,
       ExtendedEventHandler eventHandler)
       throws InvalidConfigurationException {
 
     FlagSetValue flagSetValue =
         Project.modifyBuildOptionsWithFlagSets(
-            projectFile, buildOptionsBeforeFlagSets, eventHandler, skyframeExecutor);
+            projectFile,
+            buildOptionsBeforeFlagSets,
+            enforceCanonicalConfigs,
+            eventHandler,
+            skyframeExecutor);
 
     // BuildOptions after Flagsets
     return flagSetValue.getTopLevelBuildOptions();

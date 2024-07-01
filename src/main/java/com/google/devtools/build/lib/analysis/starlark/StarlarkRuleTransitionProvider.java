@@ -79,13 +79,7 @@ public final class StarlarkRuleTransitionProvider implements TransitionFactory<R
     // that don't. Every transition has a {@code def impl(settings, attr) } signature, even if the
     // transition never reads {@code attr}. If we had a way to formally identify such transitions,
     // we wouldn't need {@code rule} in the cache key.
-    return starlarkDefinedConfigTransition
-        .getRuleTransitionCache()
-        .get(
-            ruleData,
-            x ->
-                createTransition(
-                    ruleData.rule(), ruleData.configConditions(), ruleData.configHash()));
+    return starlarkDefinedConfigTransition.createRuleTransition(ruleData, this::createTransition);
   }
 
   @Override
@@ -97,10 +91,10 @@ public final class StarlarkRuleTransitionProvider implements TransitionFactory<R
     return false;
   }
 
-  private FunctionPatchTransition createTransition(
-      Rule rule,
-      @Nullable ImmutableMap<Label, ConfigMatchingProvider> configConditions,
-      String configHash) {
+  private FunctionPatchTransition createTransition(RuleTransitionData ruleData) {
+    Rule rule = ruleData.rule();
+    ImmutableMap<Label, ConfigMatchingProvider> configConditions = ruleData.configConditions();
+    String configHash = ruleData.configHash();
     LinkedHashMap<String, Object> attributes = new LinkedHashMap<>();
     RawAttributeMapper attributeMapper = RawAttributeMapper.of(rule);
     ConfiguredAttributeMapper configuredAttributeMapper =
@@ -108,7 +102,6 @@ public final class StarlarkRuleTransitionProvider implements TransitionFactory<R
     ImmutableList<String> transitionOutputs = this.starlarkDefinedConfigTransition.getOutputs();
 
     for (Attribute attribute : rule.getAttributes()) {
-      // Store the value in an Optional, even if it's null.
       // If the value is present, even if it is null, add to the attribute map.
       Object val = attributeMapper.getRawAttributeValue(rule, attribute);
       if (val instanceof SelectorList<?> sl) {

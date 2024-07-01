@@ -478,6 +478,27 @@ class BazelOverridesTest(test_base.TestBase):
         'Target @@ss~//:choose_me up-to-date (nothing to build)', stderr
     )
 
+    # Test delete previous overrides
+    _, _, stderr = self.RunBazel(
+        [
+            'build',
+            '--announce_rc',
+            '@ss//:all',
+            '--override_module',
+            'ss=../../bb',
+            '--override_module',
+            'ss=',
+            '--enable_bzlmod',
+        ],
+        cwd=self.Path('aa/cc'),
+        allow_failure=True,
+    )
+    self.assertIn(
+        'ERROR: Error computing the main repository mapping: module not found'
+        ' in registries: ss@1.0',
+        stderr,
+    )
+
   def testCmdWorkspaceRelativeModuleOverride(self):
     self.ScratchFile(
         'MODULE.bazel',
@@ -512,6 +533,28 @@ class BazelOverridesTest(test_base.TestBase):
     self.assertIn(
         'Target @@ss~//:choose_me up-to-date (nothing to build)', stderr
     )
+
+  def testLocalPathOverrideErrorResolved(self):
+    self.ScratchFile(
+        'MODULE.bazel',
+        [
+            'bazel_dep(name = "module")',
+            'local_path_override(',
+            '  module_name = "module",',
+            '  path = "module",',
+            ')',
+        ],
+    )
+    self.ScratchFile('module/BUILD')
+
+    # MODULE.bazel file is missing
+    stderr, _, exit_code = self.RunBazel(
+        ['build', '@module//:all'], allow_failure=True
+    )
+    self.AssertNotExitCode(exit_code, 0, stderr)
+
+    self.ScratchFile('module/MODULE.bazel', ["module(name = 'module')"])
+    _, _, _ = self.RunBazel(['build', '@module//:all'])
 
 
 if __name__ == '__main__':
