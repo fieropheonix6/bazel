@@ -19,7 +19,6 @@ import static org.junit.Assert.assertThrows;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.analysis.ConfiguredRuleClassProvider;
-import com.google.devtools.build.lib.analysis.PlatformOptions;
 import com.google.devtools.build.lib.analysis.config.BuildOptions;
 import com.google.devtools.build.lib.analysis.util.BuildViewTestCase;
 import com.google.devtools.build.lib.analysis.util.DummyTestFragment;
@@ -57,8 +56,14 @@ public final class FlagSetsFunctionTest extends BuildViewTestCase {
     scratch.file(
         flagDir + "/build_settings.bzl",
         """
-string_flag = rule(implementation = lambda ctx: [], build_setting = config.string(flag = True))
-""");
+        string_flag = rule(
+            implementation = lambda ctx: [],
+            build_setting = config.string(flag = True),
+            attrs = {
+                "scope": attr.string(default = "universal"),
+            },
+        )
+        """);
     scratch.file(
         flagDir + "/BUILD",
         """
@@ -101,8 +106,8 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
             /* enforceCanonical= */ true);
     FlagSetValue flagSetsValue = executeFunction(key);
     // expects the modified BuildOptions
-    assertThat(flagSetsValue.getTopLevelBuildOptions().get(PlatformOptions.class).platforms)
-        .containsExactly(Label.parseCanonical("//buildenv/platforms/android:x86"));
+    assertThat(flagSetsValue.getOptionsFromFlagset())
+        .containsExactly("--platforms=//buildenv/platforms/android:x86");
   }
 
   @Test
@@ -137,7 +142,7 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
     FlagSetValue flagSetsValue = executeFunction(key);
 
     // expects the original BuildOptions
-    assertThat(flagSetsValue.getTopLevelBuildOptions()).isEqualTo(buildOptions);
+    assertThat(flagSetsValue.getOptionsFromFlagset()).isEmpty();
   }
 
   @Test
@@ -156,7 +161,7 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
     FlagSetValue flagSetsValue = executeFunction(key);
 
     // expects the original BuildOptions
-    assertThat(flagSetsValue.getTopLevelBuildOptions()).isEqualTo(buildOptions);
+    assertThat(flagSetsValue.getOptionsFromFlagset()).isEmpty();
   }
 
   @Test
@@ -212,7 +217,7 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
     FlagSetValue flagSetsValue = executeFunction(key);
 
     // Without enforced configs, unknown configs are a no-op.
-    assertThat(flagSetsValue.getTopLevelBuildOptions()).isEqualTo(buildOptions);
+    assertThat(flagSetsValue.getOptionsFromFlagset()).isEmpty();
     assertContainsEvent("Ignoring --scl_config=random_config_name");
   }
 
@@ -242,7 +247,7 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
 
     FlagSetValue flagSetsValue = executeFunction(key);
 
-    assertThat(flagSetsValue.getTopLevelBuildOptions()).isEqualTo(buildOptions);
+    assertThat(flagSetsValue.getOptionsFromFlagset()).isEmpty();
     assertContainsEvent(
         "Ignoring --scl_config=test_config because --enforce_project_configs is not set");
   }
@@ -264,7 +269,7 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
             /* enforceCanonical= */ false);
     FlagSetValue flagSetsValue = executeFunction(key);
 
-    assertThat(flagSetsValue.getTopLevelBuildOptions()).isEqualTo(buildOptions);
+    assertThat(flagSetsValue.getOptionsFromFlagset()).isEmpty();
   }
 
   @Test
@@ -295,12 +300,8 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
             /* enforceCanonical= */ true);
     FlagSetValue flagSetsValue = executeFunction(key);
 
-    assertThat(
-            flagSetsValue
-                .getTopLevelBuildOptions()
-                .getStarlarkOptions()
-                .get(Label.parseCanonical("//test:myflag")))
-        .isEqualTo("other_config_value");
+    assertThat(flagSetsValue.getOptionsFromFlagset())
+        .contains("--//test:myflag=other_config_value");
 
     assertContainsEvent("Applying flags from the config 'other_config'");
     // TODO: b/380581463 - Reenable the frequency check once the initial event is deduplicated.
@@ -575,8 +576,14 @@ project = {
     scratch.file(
         "test/build_settings.bzl",
         """
-string_flag = rule(implementation = lambda ctx: [], build_setting = config.string(flag = True))
-""");
+        string_flag = rule(
+            implementation = lambda ctx: [],
+            build_setting = config.string(flag = True),
+            attrs = {
+                "scope": attr.string(default = "universal"),
+            },
+        )
+        """);
     scratch.file(
         "test/BUILD",
         """
@@ -617,8 +624,14 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
     scratch.file(
         "test/build_settings.bzl",
         """
-string_flag = rule(implementation = lambda ctx: [], build_setting = config.string(flag = True))
-""");
+        string_flag = rule(
+            implementation = lambda ctx: [],
+            build_setting = config.string(flag = True),
+            attrs = {
+                "scope": attr.string(default = "universal"),
+            },
+        )
+        """);
     scratch.file(
         "test/BUILD",
         """
@@ -658,8 +671,14 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
     scratch.file(
         "test/build_settings.bzl",
         """
-string_flag = rule(implementation = lambda ctx: [], build_setting = config.string(flag = True))
-""");
+        string_flag = rule(
+            implementation = lambda ctx: [],
+            build_setting = config.string(flag = True),
+            attrs = {
+                "scope": attr.string(default = "universal"),
+            },
+        )
+        """);
     scratch.file(
         "test/BUILD",
         """
@@ -698,8 +717,14 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
     scratch.file(
         "test/build_settings.bzl",
         """
-string_flag = rule(implementation = lambda ctx: [], build_setting = config.string(flag = True))
-""");
+        string_flag = rule(
+            implementation = lambda ctx: [],
+            build_setting = config.string(flag = True),
+            attrs = {
+                "scope": attr.string(default = "universal"),
+            },
+        )
+        """);
     scratch.file(
         "test/BUILD",
         """
@@ -748,8 +773,14 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
     scratch.file(
         "test/build_settings.bzl",
         """
-string_flag = rule(implementation = lambda ctx: [], build_setting = config.string(flag = True))
-""");
+        string_flag = rule(
+            implementation = lambda ctx: [],
+            build_setting = config.string(flag = True),
+            attrs = {
+                "scope": attr.string(default = "universal"),
+            },
+        )
+        """);
     scratch.file(
         "test/BUILD",
         """
@@ -993,16 +1024,43 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
             /* enforceCanonical= */ true);
     FlagSetValue flagSetsValue = executeFunction(key);
 
-    assertThat(
-            flagSetsValue
-                .getTopLevelBuildOptions()
-                .getStarlarkOptions()
-                .get(Label.parseCanonical("//test:myflag")))
-        .isEqualTo("test_config_value");
+    assertThat(flagSetsValue.getOptionsFromFlagset())
+        .containsExactly("--//test:myflag=test_config_value");
 
     assertContainsEvent("Applying flags from the config 'test_config'");
     // TODO: b/380581463 - Reenable the frequency check once the initial event is deduplicated.
     // assertContainsEventWithFrequency("Applying flags from the config 'test_config'", 1);
+  }
+
+  @Test
+  public void nonBuildOptions_areIgnored() throws Exception {
+    createStringFlag("//test:myflag", /* defaultValue= */ "default");
+    scratch.file(
+        "test/PROJECT.scl",
+        """
+        project = {
+          "configs": {
+            "test_config": ['--bazelrc=foo'],
+          },
+          "default_config": "test_config",
+        }
+        """);
+    BuildOptions buildOptions =
+        BuildOptions.getDefaultBuildOptionsForFragments(
+            ruleClassProvider.getFragmentRegistry().getOptionsClasses());
+    setBuildLanguageOptions("--experimental_enable_scl_dialect=true");
+
+    FlagSetValue.Key key =
+        FlagSetValue.Key.create(
+            Label.parseCanonical("//test:PROJECT.scl"),
+            /* sclConfig= */ "",
+            buildOptions,
+            /* userOptions= */ ImmutableMap.of(),
+            /* enforceCanonical= */ true);
+    FlagSetValue flagSetsValue = executeFunction(key);
+
+    assertThat(flagSetsValue.getOptionsFromFlagset()).isEmpty();
+    assertDoesNotContainEvent("Applying flags from the config 'test_config'");
   }
 
   @Test
@@ -1032,12 +1090,8 @@ string_flag = rule(implementation = lambda ctx: [], build_setting = config.strin
             /* enforceCanonical= */ true);
     FlagSetValue flagSetsValue = executeFunction(key);
 
-    assertThat(
-            flagSetsValue
-                .getTopLevelBuildOptions()
-                .getStarlarkOptions()
-                .get(Label.parseCanonical("//test:myflag")))
-        .isEqualTo("test_config_value");
+    assertThat(flagSetsValue.getOptionsFromFlagset())
+        .containsExactly("--//test:myflag=test_config_value");
     assertContainsEvent("Applying flags from the config 'test_config'");
   }
 
